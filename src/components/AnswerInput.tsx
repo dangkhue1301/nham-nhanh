@@ -8,6 +8,7 @@ import {
 import { WEEKDAY_TITLES } from '../engine/calendarMath.ts';
 
 interface AnswerInputProps {
+  questionId?: string;
   answerType: AnswerType;
   unit?: string;
   disabled: boolean;
@@ -15,6 +16,7 @@ interface AnswerInputProps {
 }
 
 export const AnswerInput: React.FC<AnswerInputProps> = ({
+  questionId,
   answerType,
   unit,
   disabled,
@@ -61,7 +63,7 @@ export const AnswerInput: React.FC<AnswerInputProps> = ({
       }
     }, 50);
     return () => clearTimeout(timer);
-  }, [answerType]);
+  }, [questionId, answerType]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();

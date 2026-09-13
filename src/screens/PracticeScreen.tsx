@@ -222,6 +222,8 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
 
       {/* Answer Input */}
       <AnswerInput
+        key={currentQuestion.id}
+        questionId={currentQuestion.id}
         answerType={currentQuestion.answerType}
         unit={currentQuestion.unit}
         disabled={screenState !== 'answering'}
