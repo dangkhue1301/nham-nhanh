@@ -1,5 +1,8 @@
 # Nhẩm Nhanh — Website Luyện Tính Nhẩm
 
+- **Website trực tuyến (GitHub Pages):** [https://dangkhue1301.github.io/nham-nhanh/](https://dangkhue1301.github.io/nham-nhanh/)
+- **Mã nguồn GitHub:** [https://github.com/dangkhue1301/nham-nhanh](https://github.com/dangkhue1301/nham-nhanh)
+
 Website luyện tính nhẩm tốc độ cao, tinh gọn, mở lên là luyện được ngay, xây dựng bám sát 100% tài liệu `PLAN-website-luyen-tinh-nham.md`.
 
 ## 1. Tính năng nổi bật
