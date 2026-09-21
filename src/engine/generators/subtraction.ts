@@ -109,14 +109,14 @@ export function generateSubtractionQuestion(familyId: string, level: number, see
     }
 
     case 'S04': {
-      // Within 100, no borrow (Level 3)
+      // Within 100, no borrow, answer >= 10, no 0 (Level 3)
       normalLimitMs = 15000;
       hardLimitMs = 6000;
       skillTags.push('within_100', 'no_borrow');
       const uA = prng.nextInt(0, 9);
       const uB = prng.nextInt(0, uA);
       const tA = prng.nextInt(2, 9);
-      const tB = prng.nextInt(1, tA);
+      const tB = prng.nextInt(1, tA - 1); // tA > tB guarantees a > b and answer >= 10
       const a = tA * 10 + uA;
       const b = tB * 10 + uB;
       params = { a, b };

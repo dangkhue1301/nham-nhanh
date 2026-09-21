@@ -132,4 +132,84 @@ describe('Level Range Invariants, Elimination of 0, and Session Uniqueness', () 
 
     expect(new Set(prompts).size).toBe(20);
   });
+
+  it('S02 (Missing subtrahend): No zeros across Level 1, 2, 3 and strict ranges', () => {
+    // Level 1: a in 2..9, missing >= 1, c >= 1
+    for (let seed = 1; seed <= 50; seed++) {
+      const q = generateSubtractionQuestion('S02', 1, seed * 123);
+      expect(q.parameters.a).toBeGreaterThanOrEqual(2);
+      expect(q.parameters.a).toBeLessThanOrEqual(9);
+      expect(q.parameters.missing).toBeGreaterThanOrEqual(1);
+      expect(q.parameters.c).toBeGreaterThanOrEqual(1);
+      expect(q.answer).toBeGreaterThanOrEqual(1);
+    }
+    // Level 2: a strictly in 10..20, missing >= 1, c >= 1
+    for (let seed = 1; seed <= 50; seed++) {
+      const q = generateSubtractionQuestion('S02', 2, seed * 456);
+      expect(q.parameters.a).toBeGreaterThanOrEqual(10);
+      expect(q.parameters.a).toBeLessThanOrEqual(20);
+      expect(q.parameters.missing).toBeGreaterThanOrEqual(1);
+      expect(q.parameters.c).toBeGreaterThanOrEqual(1);
+      expect(q.answer).toBeGreaterThanOrEqual(1);
+    }
+    // Level 3: a strictly in 20..100
+    for (let seed = 1; seed <= 50; seed++) {
+      const q = generateSubtractionQuestion('S02', 3, seed * 789);
+      expect(q.parameters.a).toBeGreaterThanOrEqual(20);
+      expect(q.parameters.a).toBeLessThanOrEqual(100);
+      expect(q.parameters.missing).toBeGreaterThanOrEqual(2);
+      expect(q.parameters.c).toBeGreaterThanOrEqual(2);
+      expect(q.answer).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('S04 & S05 (Level 3 Subtraction within 100): No zeros! answer >= 1, operands 2-digit', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const q4 = generateSubtractionQuestion('S04', 3, seed * 111);
+      expect(q4.parameters.a).toBeGreaterThanOrEqual(20);
+      expect(q4.parameters.b).toBeGreaterThanOrEqual(10);
+      expect(q4.answer).toBeGreaterThanOrEqual(10); // S04 no borrow guarantees answer >= 10
+
+      const q5 = generateSubtractionQuestion('S05', 3, seed * 222);
+      expect(q5.parameters.a).toBeGreaterThanOrEqual(20);
+      expect(q5.parameters.b).toBeGreaterThanOrEqual(11);
+      expect(q5.answer).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('S06, S07, S08 (Level 4 & 5 Subtraction): Positive non-zero answers', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const q6 = generateSubtractionQuestion('S06', 4, seed * 333);
+      expect(q6.parameters.a).toBeGreaterThanOrEqual(201);
+      expect(q6.answer).toBeGreaterThanOrEqual(10);
+
+      const q7 = generateSubtractionQuestion('S07', 5, seed * 444);
+      expect(q7.answer).toBeGreaterThanOrEqual(5);
+
+      const q8 = generateSubtractionQuestion('S08', 5, seed * 555);
+      expect(q8.answer).toBeGreaterThanOrEqual(5);
+    }
+  });
+
+  it('A02 (Missing addend): No zeros across Level 1, 2, 3 and strict ranges', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const q1 = generateAdditionQuestion('A02', 1, seed * 101);
+      expect(q1.parameters.t).toBeGreaterThanOrEqual(2);
+      expect(q1.parameters.t).toBeLessThanOrEqual(9);
+      expect(q1.parameters.a).toBeGreaterThanOrEqual(1);
+      expect(q1.answer).toBeGreaterThanOrEqual(1);
+
+      const q2 = generateAdditionQuestion('A02', 2, seed * 202);
+      expect(q2.parameters.t).toBeGreaterThanOrEqual(10);
+      expect(q2.parameters.t).toBeLessThanOrEqual(20);
+      expect(q2.parameters.a).toBeGreaterThanOrEqual(1);
+      expect(q2.answer).toBeGreaterThanOrEqual(1);
+
+      const q3 = generateAdditionQuestion('A02', 3, seed * 303);
+      expect(q3.parameters.t).toBe(100);
+      expect(q3.parameters.a).toBeGreaterThanOrEqual(5);
+      expect(q3.parameters.a).toBeLessThanOrEqual(95);
+      expect(q3.answer).toBeGreaterThanOrEqual(5);
+    }
+  });
 });
