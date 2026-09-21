@@ -33,10 +33,13 @@ export function selectNextQuestion(context: QuestionSelectorContext): {
   const sessionKeySet = new Set(sessionKeys);
   const isDuplicate = (q: Question) => sessionKeySet.has(q.semanticKey) || sessionKeySet.has(q.prompt);
 
-  // 1. Check if within-session retry queue has an eligible question (at least 5 intervening questions)
+  // 1. Check if within-session retry queue has an eligible question (must match topic & level and at least 5 intervening questions)
   if (withinSessionRetryQueue.length > 0) {
     const eligibleIdx = withinSessionRetryQueue.findIndex(
-      (item) => currentQuestionIndex - item.failedAtIndex >= 5
+      (item) =>
+        item.question.topic === configuration.topic &&
+        item.question.level === configuration.level &&
+        currentQuestionIndex - item.failedAtIndex >= 5
     );
     if (eligibleIdx !== -1) {
       const [item] = withinSessionRetryQueue.splice(eligibleIdx, 1);

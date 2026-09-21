@@ -4,6 +4,7 @@ import { generateSubtractionQuestion } from '../src/engine/generators/subtractio
 import { generateMultiplicationQuestion } from '../src/engine/generators/multiplication.ts';
 import { selectNextQuestion } from '../src/engine/selectNextQuestion.ts';
 import { SessionConfiguration } from '../src/engine/types.ts';
+import { getFamily } from '../src/engine/catalog.ts';
 
 describe('Level Range Invariants, Elimination of 0, and Session Uniqueness', () => {
   it('A01 (Level 1 Addition): No zeros! Operands >= 1, sum in [2, 9]', () => {
@@ -212,4 +213,38 @@ describe('Level Range Invariants, Elimination of 0, and Session Uniqueness', () 
       expect(q3.answer).toBeGreaterThanOrEqual(5);
     }
   });
+
+  it('Retry queue strictly isolates topics and levels (no Money or wrong level leaking into Addition L1)', () => {
+    const config: SessionConfiguration = {
+      topic: 'addition',
+      level: 1,
+      mode: 'hard'
+    };
+
+    // Simulate a retry queue that has a Money Level 4 question from an earlier failure
+    const moneyFam = getFamily('P06');
+    const moneyQuestion = moneyFam.generator(12345, 4);
+
+    const retryQueue = [{ question: moneyQuestion, failedAtIndex: 0 }];
+
+    // Select question at index 16 (where currentQuestionIndex - failedAtIndex = 16 >= 5)
+    const { question, retryQueueConsumed } = selectNextQuestion({
+      configuration: config,
+      memoryCards: {},
+      dueCards: [],
+      withinSessionRetryQueue: retryQueue,
+      currentQuestionIndex: 16,
+      recentSemanticKeys: [],
+      sessionKeys: [],
+      seedOffset: 16
+    });
+
+    // The money question MUST NOT be consumed or returned!
+    expect(retryQueueConsumed).toBeUndefined();
+    expect(retryQueue.length).toBe(1);
+    expect(question.topic).toBe('addition');
+    expect(question.level).toBe(1);
+    expect(question.reviewReason).not.toBe('within_session');
+  });
 });
+

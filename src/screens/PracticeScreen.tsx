@@ -188,7 +188,7 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
           </button>
           <div>
             <div style={{ fontSize: '14px', fontWeight: 700 }}>
-              {TOPIC_NAMES[configuration.topic]} · {LEVEL_LABELS[configuration.topic][configuration.level]}
+              {TOPIC_NAMES[currentQuestion.topic]} · {LEVEL_LABELS[currentQuestion.topic][currentQuestion.level]}
             </div>
             <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
               <span className={`badge ${configuration.mode === 'hard' ? 'badge-hard' : 'badge-normal'}`}>

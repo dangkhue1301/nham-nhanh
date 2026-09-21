@@ -208,6 +208,9 @@ export const App: React.FC = () => {
   };
 
   const handleExitSession = () => {
+    setWithinSessionRetryQueue([]);
+    setSessionAttempts([]);
+    setSessionKeys([]);
     setCurrentScreen('home');
   };
 
