@@ -20,19 +20,18 @@ export function generateAdditionQuestion(familyId: string, level: number, seed: 
 
   switch (familyId) {
     case 'A01': {
-      // a + b <= 9, a, b >= 0 (Level 1)
+      // a + b <= 9, a, b >= 1 (Level 1: No 0, genuine addition under 10)
       normalLimitMs = 10000;
       hardLimitMs = 4000;
       skillTags.push('under_10');
-      const sum = prng.nextInt(0, 9);
-      const a = prng.nextInt(0, sum);
+      const sum = prng.nextInt(2, 9);
+      const a = prng.nextInt(1, sum - 1);
       const b = sum - a;
       params = { a, b };
       prompt = `${a} + ${b} = ?`;
       answer = sum;
       hint = `Cộng nhẩm từ ${a}, đếm thêm ${b} đơn vị.`;
       explanation = `${a} + ${b} = ${sum}`;
-      // Canonical semantic key
       const minVal = Math.min(a, b);
       const maxVal = Math.max(a, b);
       semanticKey = `add:${minVal}+${maxVal}`;
@@ -41,25 +40,33 @@ export function generateAdditionQuestion(familyId: string, level: number, seed: 
     }
 
     case 'A02': {
-      // a + □ = t
-      // L1: t <= 9
-      // L2: t = 10..20
-      // L3: t = 100
+      // a + □ = t (Missing addend)
+      // L1: t = 2..9, a >= 1, missing >= 1
+      // L2: t = 10..20, a >= 1, missing >= 1 (Strictly within 10..20!)
+      // L3: t = 100, a in 5..95
       let t = 9;
+      let minA = 1;
+      let maxA = 8;
       if (level === 1) {
         normalLimitMs = 10000;
         hardLimitMs = 4000;
-        t = prng.nextInt(1, 9);
+        t = prng.nextInt(2, 9);
+        minA = 1;
+        maxA = t - 1;
       } else if (level === 2) {
         normalLimitMs = 15000;
         hardLimitMs = 6000;
         t = prng.nextInt(10, 20);
+        minA = 1;
+        maxA = t - 1;
       } else {
         normalLimitMs = 15000;
         hardLimitMs = 6000;
         t = 100;
+        minA = 5;
+        maxA = 95;
       }
-      const a = prng.nextInt(0, t);
+      const a = prng.nextInt(minA, maxA);
       const missing = t - a;
       params = { a, t, missing };
       prompt = `${formatInteger(a)} + □ = ${formatInteger(t)}`;
@@ -72,20 +79,39 @@ export function generateAdditionQuestion(familyId: string, level: number, seed: 
     }
 
     case 'A03': {
-      // 1-digit + 1-digit crossing 10, total in [10, 20] (Level 2)
+      // Addition within 20, sum in [10, 20], no zeros (Level 2)
       normalLimitMs = 15000;
       hardLimitMs = 6000;
-      skillTags.push('cross_10');
-      // a in [2..9], b in [2..9] such that a + b in [10, 18]
-      const a = prng.nextInt(2, 9);
-      const minB = Math.max(1, 10 - a);
-      const b = prng.nextInt(minB, 9);
+      skillTags.push('within_20');
+      // Mix between:
+      // Type 1: 1-digit + 1-digit crossing 10 (a, b in 2..9, sum 10..18)
+      // Type 2: 2-digit + 1-digit within 20 (a in 10..19, b in 1..20-a, sum 11..20)
+      const isTwoDigit = prng.nextInt(0, 1) === 1;
+      let a = 0;
+      let b = 0;
+      if (isTwoDigit) {
+        a = prng.nextInt(10, 18);
+        b = prng.nextInt(1, 20 - a);
+        if (prng.nextInt(0, 1) === 1) {
+          const tmp = a;
+          a = b;
+          b = tmp;
+        }
+      } else {
+        a = prng.nextInt(2, 9);
+        const minB = Math.max(1, 10 - a);
+        b = prng.nextInt(minB, 9);
+      }
       const sum = a + b;
       params = { a, b };
       prompt = `${a} + ${b} = ?`;
       answer = sum;
-      hint = `Tách số hạng thứ hai để ghép với ${a} cho tròn 10.`;
-      explanation = strategyMakeTen(a, b);
+      hint = a < 10 && b < 10
+        ? `Tách số hạng thứ hai để ghép với ${a} cho tròn 10.`
+        : `Cộng nhẩm phần đơn vị: ${a % 10} + ${b % 10}, rồi ghép vào hàng chục.`;
+      explanation = a < 10 && b < 10
+        ? strategyMakeTen(a, b)
+        : `${a} + ${b} = ${sum}`;
       const minVal = Math.min(a, b);
       const maxVal = Math.max(a, b);
       semanticKey = `add:${minVal}+${maxVal}`;

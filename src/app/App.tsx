@@ -38,6 +38,7 @@ export const App: React.FC = () => {
     { question: Question; failedAtIndex: number }[]
   >([]);
   const [latestSummary, setLatestSummary] = useState<SessionSummary | null>(null);
+  const [sessionKeys, setSessionKeys] = useState<string[]>([]);
 
   const TOTAL_SESSION_QUESTIONS = 20;
 
@@ -49,7 +50,12 @@ export const App: React.FC = () => {
 
   // Generate next question
   const prepareNextQuestion = useCallback(
-    (index: number, config: SessionConfiguration, retryQueue = withinSessionRetryQueue) => {
+    (
+      index: number,
+      config: SessionConfiguration,
+      retryQueue = withinSessionRetryQueue,
+      currentSessionKeys = sessionKeys
+    ) => {
       const todayStr = getTodayLocalDateStr();
       const dueCards = getDueMemoryCards(progressState.memoryCards, todayStr);
 
@@ -60,12 +66,14 @@ export const App: React.FC = () => {
         withinSessionRetryQueue: retryQueue,
         currentQuestionIndex: index,
         recentSemanticKeys: progressState.recentSemanticKeys,
+        sessionKeys: currentSessionKeys,
         seedOffset: index
       });
 
       setCurrentQuestion(next.question);
+      setSessionKeys([...currentSessionKeys, next.question.semanticKey, next.question.prompt]);
     },
-    [progressState, withinSessionRetryQueue]
+    [progressState, withinSessionRetryQueue, sessionKeys]
   );
 
   // Start a new session
@@ -74,6 +82,7 @@ export const App: React.FC = () => {
     setQuestionIndex(0);
     setSessionAttempts([]);
     setWithinSessionRetryQueue([]);
+    setSessionKeys([]);
 
     // Update last selection in progress
     setProgressState((prev) => ({
@@ -81,7 +90,7 @@ export const App: React.FC = () => {
       lastSelection: config
     }));
 
-    prepareNextQuestion(0, config, []);
+    prepareNextQuestion(0, config, [], []);
     setCurrentScreen('practice');
   };
 
@@ -194,7 +203,7 @@ export const App: React.FC = () => {
       setCurrentScreen('results');
     } else {
       setQuestionIndex(nextIdx);
-      prepareNextQuestion(nextIdx, currentConfig);
+      prepareNextQuestion(nextIdx, currentConfig, withinSessionRetryQueue, sessionKeys);
     }
   };
 

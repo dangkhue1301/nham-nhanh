@@ -19,12 +19,12 @@ export function generateSubtractionQuestion(familyId: string, level: number, see
 
   switch (familyId) {
     case 'S01': {
-      // 0 <= b <= a <= 9 (Level 1)
+      // 1 <= b < a <= 9, answer >= 1 (Level 1: No 0, genuine subtraction under 10)
       normalLimitMs = 10000;
       hardLimitMs = 4000;
       skillTags.push('under_10');
-      const a = prng.nextInt(0, 9);
-      const b = prng.nextInt(0, a);
+      const a = prng.nextInt(2, 9);
+      const b = prng.nextInt(1, a - 1);
       params = { a, b };
       prompt = `${a} − ${b} = ?`;
       answer = a - b;
@@ -36,24 +36,34 @@ export function generateSubtractionQuestion(familyId: string, level: number, see
     }
 
     case 'S02': {
-      // a - □ = c
-      let maxA = 9;
+      // a - □ = c (Missing subtrahend)
+      // L1: a = 2..9, missing >= 1, c >= 1
+      // L2: a = 10..20, missing >= 1, c >= 1 (Strictly within 10..20!)
+      // L3: a = 20..100, missing >= 2, c >= 2
+      let a = 9;
+      let minMissing = 1;
+      let maxMissing = 8;
       if (level === 1) {
         normalLimitMs = 10000;
         hardLimitMs = 4000;
-        maxA = 9;
+        a = prng.nextInt(2, 9);
+        minMissing = 1;
+        maxMissing = a - 1;
       } else if (level === 2) {
         normalLimitMs = 15000;
         hardLimitMs = 6000;
-        maxA = 20;
+        a = prng.nextInt(10, 20);
+        minMissing = 1;
+        maxMissing = a - 1;
       } else {
         normalLimitMs = 15000;
         hardLimitMs = 6000;
-        maxA = 100;
+        a = prng.nextInt(20, 100);
+        minMissing = 2;
+        maxMissing = a - 2;
       }
-      const a = prng.nextInt(1, maxA);
-      const c = prng.nextInt(0, a);
-      const missing = a - c;
+      const missing = prng.nextInt(minMissing, maxMissing);
+      const c = a - missing;
       params = { a, c, missing };
       prompt = `${formatInteger(a)} − □ = ${formatInteger(c)}`;
       answer = missing;
@@ -65,19 +75,34 @@ export function generateSubtractionQuestion(familyId: string, level: number, see
     }
 
     case 'S03': {
-      // Crossing 10, a in [10..20], b in [2..9] such that a - b in [1..9] (Level 2)
+      // Subtraction within 20, minuend a strictly in [10, 20], no zeros (Level 2)
       normalLimitMs = 15000;
       hardLimitMs = 6000;
-      skillTags.push('cross_10');
-      const b = prng.nextInt(2, 9);
-      const res = prng.nextInt(1, 9);
-      const a = res + b;
-      // ensure a in [10, 18]
+      skillTags.push('within_20');
+      // Mix between:
+      // Type 1: Crossing 10 (a in 11..18, b in (a-9)..9, answer in 1..9)
+      // Type 2: Non-crossing 2-digit - 1-digit (a in 11..20, b in 1..min(9, a-10), answer in 10..19)
+      const isCrossTen = prng.nextInt(0, 1) === 1;
+      let a = 0;
+      let b = 0;
+      if (isCrossTen) {
+        a = prng.nextInt(11, 18);
+        const minB = a - 9;
+        b = prng.nextInt(minB, 9);
+      } else {
+        a = prng.nextInt(11, 20);
+        const maxB = Math.max(1, Math.min(9, a - 10));
+        b = prng.nextInt(1, maxB);
+      }
       params = { a, b };
       prompt = `${a} − ${b} = ?`;
       answer = a - b;
-      hint = `Trừ ${a - 10} để về 10, rồi trừ tiếp phần còn lại của ${b}.`;
-      explanation = `${a} − ${b} = (${a} − ${a - 10}) − (${b - (a - 10)}) = 10 − ${b - (a - 10)} = ${answer}`;
+      hint = isCrossTen
+        ? `Trừ ${a - 10} để về 10, rồi trừ tiếp phần còn lại của ${b}.`
+        : `Lấy hàng đơn vị trừ hàng đơn vị: ${a % 10} − ${b}, rồi ghép vào hàng chục.`;
+      explanation = isCrossTen
+        ? `${a} − ${b} = (${a} − ${a - 10}) − (${b - (a - 10)}) = 10 − ${b - (a - 10)} = ${answer}`
+        : `${a} − ${b} = ${answer}`;
       semanticKey = `sub_cross10:${a}-${b}`;
       memoryKey = `fact:sub:${a}-${b}`;
       break;

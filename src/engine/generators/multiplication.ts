@@ -52,18 +52,16 @@ export function generateMultiplicationQuestion(
     }
 
     case 'M02': {
-      // Multiply with 0, 1, 10 (Level 1)
+      // Multiply with 1, 10 (Level 1, no 0)
       normalLimitMs = 10000;
       hardLimitMs = 4000;
       skillTags.push('times_table_special');
-      const special = prng.pick([0, 1, 10]);
+      const special = prng.pick([1, 10]);
       const a = prng.nextInt(1, 9);
       params = { a, special };
       prompt = `${a} × ${special} = ?`;
       answer = a * special;
-      if (special === 0) {
-        hint = `Bất kỳ số nào nhân với 0 đều bằng 0.`;
-      } else if (special === 1) {
+      if (special === 1) {
         hint = `Bất kỳ số nào nhân với 1 đều bằng chính nó.`;
       } else {
         hint = `Nhân một số với 10: viết thêm một chữ số 0 vào bên phải.`;
