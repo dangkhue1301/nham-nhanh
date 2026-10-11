@@ -33,6 +33,8 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({ sessionId, confi
   const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const steps = question.steps || [];
   const spec = learning && steps.length ? steps[stepIndex] : question;
+  const completedCount = questionIndex + (state === 'feedback' ? 1 : 0);
+  const timerRatio = timeLimit ? Math.min(1, Math.max(0, remaining / timeLimit)) : 0;
 
   useEffect(() => {
     setState('answering'); setAttempt(null); setRemaining(timeLimit); setStepIndex(0); setStepFeedback(false); setStepError(''); setHintLevel(0);
@@ -107,13 +109,20 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({ sessionId, confi
   </section>;
 
   return <section className="glass-card practice-card">
-    <header className="practice-header">
-      <button className="btn-back" onClick={onExitSession} aria-label="Kết thúc lượt và về trang chủ">←</button>
-      <div className="practice-heading"><div className="eyebrow">{TOPIC_NAMES[configuration.topic]}</div><h1>{LEVEL_LABELS[configuration.topic][question.level].replace(/^(Level|Mức) \d+ · /, '')}</h1></div>
-      <div className="question-counter"><strong>Câu {questionIndex + 1}/{totalQuestions}</strong><span className="muted">{learning ? 'Học từng bước' : configuration.mode === 'hard' ? 'Tốc độ cao' : 'Luyện nhẩm'}</span></div>
-    </header>
-    <div className="session-track" role="progressbar" aria-label="Tiến độ lượt luyện" aria-valuemin={0} aria-valuemax={totalQuestions} aria-valuenow={questionIndex}><span style={{ width: `${questionIndex / totalQuestions * 100}%` }} /></div>
-    {!learning && <div className={`timer-row ${remaining <= 3000 ? 'timer-warning' : ''}`}><span>Còn {Math.ceil(remaining / 1000)} giây</span><div className="timer-track"><span style={{ width: `${remaining / timeLimit * 100}%` }} /></div></div>}
+    <div className="practice-toolbar">
+      <header className="practice-header">
+        <button className="btn-back practice-back" onClick={onExitSession} aria-label="Kết thúc lượt và về trang chủ"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6" /></svg></button>
+        <div className="practice-heading"><h1>{TOPIC_NAMES[configuration.topic]}</h1><p className="practice-level">{LEVEL_LABELS[configuration.topic][question.level].replace('Level', 'Mức')}</p></div>
+      </header>
+      <div className="practice-status-row">
+        <div className="practice-status-text"><strong className="question-counter">Câu {questionIndex + 1}/{totalQuestions}</strong>{!learning && <span className="practice-mode">{configuration.mode === 'hard' ? 'Tốc độ cao' : 'Luyện nhẩm'}</span>}</div>
+        {learning ? <span className="practice-untimed">Học từng bước</span> : <div className={`timer-row ${remaining <= 3000 && state === 'answering' ? 'timer-warning' : ''} ${state === 'feedback' ? 'timer-finished' : ''}`} role="timer" aria-live="off" aria-label={state === 'feedback' ? 'Đã trả lời câu này' : `Còn ${Math.ceil(remaining / 1000)} giây`}>
+          <svg className="timer-ring" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle className="timer-ring-track" cx="12" cy="12" r="10" /><circle className="timer-ring-fill" cx="12" cy="12" r="10" strokeDasharray="62.832" strokeDashoffset={62.832 * (1 - timerRatio)} /><path d="M12 7v5l3 2" /></svg>
+          <span>{state === 'feedback' ? 'Đã trả lời' : <><span className="timer-label">Còn </span><strong>{Math.ceil(remaining / 1000)}s</strong></>}</span>
+        </div>}
+      </div>
+      <div className="session-track" role="progressbar" aria-label="Tiến độ lượt luyện" aria-valuemin={0} aria-valuemax={totalQuestions} aria-valuenow={completedCount} aria-valuetext={`${completedCount}/${totalQuestions} câu đã làm`} style={{ gridTemplateColumns: `repeat(${totalQuestions}, minmax(0, 1fr))` }}>{Array.from({ length: totalQuestions }, (_, i) => <span key={i} className={i < completedCount ? 'is-complete' : i === questionIndex ? 'is-current' : undefined} />)}</div>
+    </div>
     <QuestionCard question={question} />
     {learning && state === 'answering' && <div className="learning-step"><span className="eyebrow">Bước {stepIndex + 1}/{steps.length}</span><h2>{spec.prompt}</h2></div>}
     <AnswerInput key={`${question.id}:${stepIndex}`} questionId={`${question.id}:${stepIndex}`} spec={spec} disabled={state !== 'answering' || stepFeedback} onSubmit={submit} submitLabel={learning ? 'Kiểm tra bước này' : 'Trả lời'} />

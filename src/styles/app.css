@@ -94,19 +94,30 @@ summary::marker { color: var(--color-primary); }
 .home-footer p + p { margin-top: 4px; }
 /* Practice */
 .practice-card, .results-card { max-width: 680px; margin-inline: auto; }
-.practice-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.practice-toolbar { display: grid; gap: 16px; margin-bottom: 24px; }
+.practice-header { display: flex; align-items: center; gap: 12px; }
 .btn-back { width: 40px; padding: 0; flex-shrink: 0; font-size: 20px; }
+.practice-back { border-radius: 10px; color: var(--color-text-secondary); }
 .practice-heading { min-width: 0; flex: 1; }
-.practice-heading h1 { font-size: 16px; }
-.question-counter { text-align: right; white-space: nowrap; font-size: 14px; }
-.question-counter .muted { display: block; font-size: 12px; }
-.session-track, .timer-track { background: #e2e8f0; height: 4px; border-radius: 4px; overflow: hidden; }
-.session-track > span, .timer-track > span { display: block; height: 100%; background: var(--color-primary); }
-.timer-row { display: flex; gap: 12px; align-items: center; margin-top: 12px; color: var(--color-text-secondary); font-size: 12px; }
-.timer-row > span { min-width: 84px; }
-.timer-track { flex: 1; background: #eef0f7; }
-.timer-warning { color: var(--color-error); }
-.timer-warning .timer-track > span { background: var(--color-error); }
+.practice-heading h1 { font-size: 18px; font-weight: 600; }
+.practice-level { color: var(--color-text-secondary); font-size: 12px; margin-top: 2px; }
+.practice-status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.practice-status-text { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.question-counter { white-space: nowrap; font-size: 14px; font-weight: 600; }
+.practice-mode { padding-left: 8px; border-left: 1px solid var(--color-input-border); font-size: 12px; color: var(--color-text-secondary); }
+.practice-untimed { color: var(--color-text-secondary); font-size: 12px; white-space: nowrap; }
+.session-track { display: grid; gap: 4px; height: 4px; }
+.session-track > span { min-width: 0; background: #e2e8f0; border-radius: 4px; }
+.session-track > .is-complete { background: var(--color-primary); }
+.session-track > .is-current { background: color-mix(in srgb, var(--color-primary) 45%, white); }
+.timer-row { display: inline-flex; gap: 8px; align-items: center; min-height: 36px; padding: 4px 10px 4px 6px; border-radius: 8px; background: var(--color-primary-light); color: var(--color-primary); font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+.timer-row strong { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.timer-ring { flex-shrink: 0; fill: none; stroke-width: 1.5; }
+.timer-ring-track { stroke: currentColor; opacity: .15; }
+.timer-ring-fill { stroke: currentColor; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; transition: stroke-dashoffset .1s linear; }
+.timer-ring path { stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+.timer-warning { color: var(--color-error); background: var(--color-error-bg); }
+.timer-finished { color: var(--color-text-secondary); background: #f1f5f9; }
 .question-container { margin: 24px 0; }
 .question-math { font-size: clamp(24px, 5vw, 40px); font-weight: 700; line-height: 1.5; text-align: center; overflow-wrap: anywhere; }
 .question-life { font-size: 18px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
@@ -200,10 +211,12 @@ summary::marker { color: var(--color-primary); }
   .stats-filters { grid-template-columns: 1fr; gap: 12px; }
   .daily-chart { gap: 4px; }
   .daily-table th, .daily-table td { padding-inline: 8px; }
-  .practice-header { gap: 8px; align-items: start; }
-  .practice-heading h1 { font-size: 14px; }
-  .question-counter { font-size: 12px; }
-  .question-counter .muted { max-width: 80px; white-space: normal; }
+  .practice-toolbar { gap: 12px; }
+  .practice-header { gap: 12px; }
+  .practice-status-row { gap: 8px; }
+  .practice-status-text { column-gap: 6px; row-gap: 4px; }
+  .practice-mode { padding-left: 6px; }
+  .timer-row { gap: 6px; padding-right: 8px; }
   .question-life { font-size: 16px; }
   .answer-number { font-size: 24px; }
   .date-fields { gap: 8px; }
