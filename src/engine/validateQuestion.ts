@@ -1,4 +1,4 @@
-import { Question } from './types.ts';
+import { AnswerSpec, Question } from './types.ts';
 import { isValidDate } from './calendarMath.ts';
 
 export function validateQuestion(q: Question): boolean {
@@ -9,6 +9,7 @@ export function validateQuestion(q: Question): boolean {
   if (q.normalLimitMs <= 0 || q.hardLimitMs <= 0 || q.hardLimitMs >= q.normalLimitMs) {
     return false;
   }
+  if (!validateAnswerSpec(q) || (q.steps && (!q.steps.length || q.steps.some(s => !s.prompt || !validateAnswerSpec(s))))) return false;
 
   // Check by answerType
   if (q.answerType === 'integer') {
@@ -60,4 +61,16 @@ export function validateQuestion(q: Question): boolean {
   }
 
   return true;
+}
+
+function validateAnswerSpec(spec: AnswerSpec): boolean {
+  const n = spec.answer;
+  if (spec.answerType === 'integer' || spec.answerType === 'signed') return typeof n === 'number' && Number.isSafeInteger(n) && (spec.answerType === 'signed' || n >= 0) && Math.abs(n) <= 10_000_000;
+  if (spec.answerType === 'decimal') return typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1_000_000 && Math.abs(n * 10000 - Math.round(n * 10000)) < 1e-6;
+  if (spec.answerType === 'blanks') return Array.isArray(n) && n.length > 0 && n.length === spec.fields?.length && spec.fields.every((f, i) => validateAnswerSpec({ answerType: f.type, answer: n[i] }));
+  if (spec.answerType === 'choice') return typeof n === 'number' && Number.isInteger(n) && !!spec.choices && spec.choices.length >= 2 && spec.choices.length <= 4 && new Set(spec.choices).size === spec.choices.length && n >= 0 && n < spec.choices.length;
+  if (spec.answerType === 'clock') return typeof n === 'object' && n !== null && 'hour' in n && 'minute' in n && Number.isInteger(n.hour) && Number.isInteger(n.minute) && n.hour >= 0 && n.hour <= 23 && n.minute >= 0 && n.minute <= 59;
+  if (spec.answerType === 'date') return typeof n === 'object' && n !== null && 'day' in n && 'month' in n && 'year' in n && isValidDate(n.day, n.month, n.year);
+  if (spec.answerType === 'weekday') return typeof n === 'number' && Number.isInteger(n) && n >= 2 && n <= 8;
+  return false;
 }

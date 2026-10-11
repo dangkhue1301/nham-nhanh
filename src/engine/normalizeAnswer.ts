@@ -1,5 +1,6 @@
 import {
   AnswerType,
+  AnswerSpec,
   ClockAnswer,
   DateAnswer,
   RawAnswerValue,
@@ -46,7 +47,7 @@ export function parseIntegerAnswer(input: string): ParseResult {
   }
 
   // Check thousands grouping with dots: e.g. 1.000, 25.000, 1.000.000
-  if (/^\d{1,3}(\.\d{3})+$/.test(trimmed)) {
+  if (/^[1-9]\d{0,2}(\.\d{3})+$/.test(trimmed)) {
     const raw = trimmed.replace(/\./g, '');
     const num = Number(raw);
     if (!Number.isSafeInteger(num)) {
@@ -56,7 +57,7 @@ export function parseIntegerAnswer(input: string): ParseResult {
   }
 
   // Check thousands grouping with spaces: e.g. 1 000, 25 000, 1 000 000
-  if (/^\d{1,3}(\s\d{3})+$/.test(trimmed)) {
+  if (/^[1-9]\d{0,2}(\s\d{3})+$/.test(trimmed)) {
     const raw = trimmed.replace(/\s+/g, '');
     const num = Number(raw);
     if (!Number.isSafeInteger(num)) {
@@ -71,6 +72,16 @@ export function parseIntegerAnswer(input: string): ParseResult {
   }
 
   return { valid: false, error: 'Vui lòng chỉ nhập các chữ số' };
+}
+
+export function parseNumericAnswer(input: string, type: 'integer' | 'signed' | 'decimal'): ParseResult {
+  if (type === 'integer') return parseIntegerAnswer(input);
+  const value = input.trim().replace(/−/g, '-');
+  const pattern = type === 'signed' ? /^-?(0|[1-9]\d*)$/ : /^(0|[1-9]\d*)([.,]\d{1,4})?$/;
+  if (!pattern.test(value)) return { valid: false, error: type === 'signed' ? 'Nhập số nguyên có dấu, ví dụ −3 hoặc 5.' : 'Nhập số không âm, tối đa 4 chữ số thập phân; ví dụ 12,5.' };
+  const number = Number(value.replace(',', '.'));
+  if (!Number.isFinite(number) || Math.abs(number) > Number.MAX_SAFE_INTEGER) return { valid: false, error: 'Số vượt giới hạn tính toán.' };
+  return { valid: true, value: number };
 }
 
 export function parseClockAnswer(hourStr: string, minStr: string): ParseResult {
@@ -131,30 +142,34 @@ export function parseDateAnswer(dayStr: string, monthStr: string, yearStr: strin
 export function areAnswersEqual(
   type: AnswerType,
   submitted: RawAnswerValue,
-  expected: RawAnswerValue
+  expected: RawAnswerValue,
+  unordered = false
 ): boolean {
-  if (type === 'integer') {
-    return Number(submitted) === Number(expected);
+  if (type === 'blanks') {
+    if (!Array.isArray(submitted) || !Array.isArray(expected) || submitted.length !== expected.length) return false;
+    const s = unordered ? [...submitted].sort((a, b) => a - b) : submitted;
+    const e = unordered ? [...expected].sort((a, b) => a - b) : expected;
+    return s.every((n, i) => Number.isFinite(n) && Math.abs(n - e[i]) < 1e-8);
   }
-  if (type === 'weekday') {
-    return Number(submitted) === Number(expected);
+  if (['integer', 'signed', 'decimal', 'choice', 'weekday'].includes(type)) {
+    return typeof submitted === 'number' && typeof expected === 'number' && Number.isFinite(submitted) && Math.abs(submitted - expected) < 1e-8;
   }
   if (type === 'clock') {
     const s = submitted as ClockAnswer;
     const e = expected as ClockAnswer;
-    return s.hour === e.hour && s.minute === e.minute;
+    return !!s && !!e && s.hour === e.hour && s.minute === e.minute;
   }
   if (type === 'date') {
     const s = submitted as DateAnswer;
     const e = expected as DateAnswer;
-    return s.day === e.day && s.month === e.month && s.year === e.year;
+    return !!s && !!e && s.day === e.day && s.month === e.month && s.year === e.year;
   }
   return false;
 }
 
 export function formatExpectedAnswer(type: AnswerType, expected: RawAnswerValue, unit?: string): string {
-  if (type === 'integer') {
-    const val = (expected as number).toLocaleString('vi-VN');
+  if (['integer', 'signed', 'decimal'].includes(type)) {
+    const val = (expected as number).toLocaleString('vi-VN', { maximumFractionDigits: 4 });
     return unit ? `${val} ${unit}` : val;
   }
   if (type === 'clock') {
@@ -179,4 +194,10 @@ export function formatExpectedAnswer(type: AnswerType, expected: RawAnswerValue,
     return map[w] || String(w);
   }
   return String(expected);
+}
+
+export function formatAnswer(spec: AnswerSpec): string {
+  if (spec.answerType === 'choice') return spec.choices?.[spec.answer as number] || 'Đáp án chưa có';
+  if (spec.answerType === 'blanks') return (spec.answer as number[]).map((value, i) => `${spec.fields?.[i]?.label || `Ô ${i + 1}`} = ${value.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}`).join('; ');
+  return formatExpectedAnswer(spec.answerType, spec.answer, spec.unit);
 }

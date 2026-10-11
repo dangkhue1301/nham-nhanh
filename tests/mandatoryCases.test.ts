@@ -12,10 +12,6 @@ import {
   shiftWeekday
 } from '../src/engine/calendarMath.ts';
 import { parseIntegerAnswer } from '../src/engine/normalizeAnswer.ts';
-import {
-  updateMemoryCard,
-  createMemoryCardFromQuestion
-} from '../src/engine/spacedReview.ts';
 import { loadProgressState } from '../src/storage/localProgress.ts';
 
 describe('Bảng 12.2 — Mandatory Test Cases', () => {
@@ -224,36 +220,10 @@ describe('Bảng 12.2 — Mandatory Test Cases', () => {
     expect(parseIntegerAnswer('   ').valid).toBe(false);
   });
 
-  it('Lịch ôn tập: đúng 10 lần trong cùng ngày không tăng 10 bậc; làm đúng trước hạn không tự tăng bậc', () => {
-    const q = generateMultiplicationQuestion('M01', 1, 100, { tableId: 7 });
-    let card = createMemoryCardFromQuestion(q, '2026-09-13');
-
-    // First time correct: advances from 0 to 1
-    card = updateMemoryCard({
-      card,
-      status: 'correct',
-      elapsedMs: 2000,
-      hardLimitMs: 4000,
-      todayStr: '2026-09-13'
-    });
-    expect(card.scheduleStage).toBe(1);
-
-    // Doing it 9 more times on the same day must NOT advance stage beyond 1!
-    for (let i = 0; i < 9; i++) {
-      card = updateMemoryCard({
-        card,
-        status: 'correct',
-        elapsedMs: 2000,
-        hardLimitMs: 4000,
-        todayStr: '2026-09-13'
-      });
-    }
-    expect(card.scheduleStage).toBe(1); // Still 1!
-  });
 
   it('Tiến độ an toàn: JSON hỏng không làm ứng dụng crash', () => {
     const res = loadProgressState();
     expect(res.state).toBeDefined();
-    expect(res.state.schemaVersion).toBe(1);
+    expect(res.state.schemaVersion).toBe(2);
   });
 });

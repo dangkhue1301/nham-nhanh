@@ -1,130 +1,25 @@
 import React from 'react';
-import { Mode, SessionConfiguration, Topic } from '../engine/types.ts';
+import { SessionConfiguration, Topic, Mode } from '../engine/types.ts';
 import { LEVEL_LABELS, TOPIC_NAMES } from '../engine/catalog.ts';
+import { isThinkingTopic } from '../engine/generators/thinking.ts';
 
-interface LevelPickerProps {
-  configuration: SessionConfiguration;
-  onChange: (config: SessionConfiguration) => void;
-}
-
-export const LevelPicker: React.FC<LevelPickerProps> = ({ configuration, onChange }) => {
-  const topics: Topic[] = [
-    'addition',
-    'subtraction',
-    'multiplication',
-    'division',
-    'mixed',
-    'money',
-    'time',
-    'calendar'
-  ];
-
-  const handleTopicChange = (topic: Topic) => {
-    onChange({
-      ...configuration,
-      topic,
-      level: 1,
-      tableId: (topic === 'multiplication' || topic === 'division') ? undefined : undefined
-    });
-  };
-
-  const handleLevelChange = (level: number) => {
-    onChange({
-      ...configuration,
-      level
-    });
-  };
-
-  const handleModeChange = (mode: Mode) => {
-    onChange({
-      ...configuration,
-      mode
-    });
-  };
-
-  const handleTableChange = (tableIdVal: string) => {
-    const tableId = tableIdVal === 'all' ? undefined : Number(tableIdVal);
-    onChange({
-      ...configuration,
-      tableId
-    });
-  };
-
-  const isBasicTableTopic =
-    (configuration.topic === 'multiplication' || configuration.topic === 'division') &&
-    configuration.level === 1;
-
-  const currentLevelLabels = LEVEL_LABELS[configuration.topic];
-
-  return (
-    <div>
-      <div className="form-group">
-        <label className="form-label">Chủ đề</label>
-        <select
-          className="select-control"
-          value={configuration.topic}
-          onChange={(e) => handleTopicChange(e.target.value as Topic)}
-        >
-          {topics.map((t) => (
-            <option key={t} value={t}>
-              {TOPIC_NAMES[t]}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">Cấp độ</label>
-        <select
-          className="select-control"
-          value={configuration.level}
-          onChange={(e) => handleLevelChange(Number(e.target.value))}
-        >
-          {[1, 2, 3, 4, 5].map((lvl) => (
-            <option key={lvl} value={lvl}>
-              {currentLevelLabels[lvl]}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {isBasicTableTopic && (
-        <div className="form-group">
-          <label className="form-label">Bảng đang luyện</label>
-          <select
-            className="select-control"
-            value={configuration.tableId ?? 'all'}
-            onChange={(e) => handleTableChange(e.target.value)}
-          >
-            <option value="all">Tất cả các bảng (2–9)</option>
-            {[2, 3, 4, 5, 6, 7, 8, 9].map((tbl) => (
-              <option key={tbl} value={tbl}>
-                Bảng {tbl}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div className="form-group">
-        <label className="form-label">Tốc độ luyện tập</label>
-        <div className="mode-toggle-group">
-          <button
-            type="button"
-            className={`mode-btn ${configuration.mode === 'normal' ? 'active' : ''}`}
-            onClick={() => handleModeChange('normal')}
-          >
-            Normal · Bình thường
-          </button>
-          <button
-            type="button"
-            className={`mode-btn ${configuration.mode === 'hard' ? 'active' : ''}`}
-            onClick={() => handleModeChange('hard')}
-          >
-            Hard · Tốc độ cao
-          </button>
-        </div>
-      </div>
+export const TOPIC_GROUPS: { name: string; topics: Topic[] }[] = [
+  { name: 'Nhẩm cơ bản', topics: ['addition','subtraction','multiplication','division','mixed','decomposition'] },
+  { name: 'Tư duy toán THCS', topics: ['identities','factoring','geometry'] },
+  { name: 'Toán đời sống', topics: ['money','time','calendar'] }
+];
+export const MODE_NAMES: Record<Mode, string> = { normal: 'Luyện nhẩm', hard: 'Tốc độ cao', learn: 'Học từng bước' };
+interface Props { configuration: SessionConfiguration; onChange: (config: SessionConfiguration) => void; }
+export const LevelPicker: React.FC<Props> = ({ configuration: config, onChange }) => {
+  const thinking = isThinkingTopic(config.topic);
+  const changeTopic = (topic: Topic) => onChange({ ...config, topic, level: 1, tableId: undefined, mode: config.mode === 'learn' && !isThinkingTopic(topic) ? 'normal' : config.mode });
+  const table = (config.topic === 'multiplication' || config.topic === 'division') && config.level === 1;
+  return <div className="configuration-form">
+    <div className="picker-fields">
+      <div className="form-group"><label className="form-label" htmlFor="topic">Chủ đề</label><select id="topic" className="select-control" value={config.topic} onChange={e => changeTopic(e.target.value as Topic)}>{TOPIC_GROUPS.map(group => <optgroup label={group.name} key={group.name}>{group.topics.map(topic => <option key={topic} value={topic}>{TOPIC_NAMES[topic]}</option>)}</optgroup>)}</select></div>
+      <div className="form-group"><label className="form-label" htmlFor="level">Cấp độ</label><select id="level" className="select-control" value={config.level} onChange={e => onChange({ ...config, level: Number(e.target.value), tableId: undefined })}>{[1,2,3,4,5].map(level => <option key={level} value={level}>{LEVEL_LABELS[config.topic][level].replace('Level', 'Mức')}</option>)}</select></div>
     </div>
-  );
+    {table && <div className="form-group"><label className="form-label" htmlFor="table">Bảng đang luyện</label><select id="table" className="select-control" value={config.tableId ?? 'all'} onChange={e => onChange({ ...config, tableId: e.target.value === 'all' ? undefined : Number(e.target.value) })}><option value="all">Tất cả các bảng (2–9)</option>{[2,3,4,5,6,7,8,9].map(n => <option key={n} value={n}>Bảng {n}</option>)}</select></div>}
+    <fieldset className="form-group mode-fieldset"><legend className="form-label">Cách luyện</legend><div className={`mode-toggle-group ${thinking ? 'three-modes' : ''}`}>{(thinking ? ['normal','hard','learn'] : ['normal','hard']).map(mode => <button key={mode} type="button" className={`mode-btn ${config.mode === mode ? 'active' : ''}`} aria-pressed={config.mode === mode} onClick={() => onChange({ ...config, mode: mode as Mode })}>{MODE_NAMES[mode as Mode]}</button>)}</div><p className="control-help">{config.mode === 'learn' ? '10 bài, không đếm ngược. Điền từng bước và xem cách làm.' : config.mode === 'hard' ? '20 câu, thời gian ngắn hơn. Không dùng gợi ý.' : '20 câu có thời gian. Có gợi ý khi bạn cần.'}</p></fieldset>
+  </div>;
 };

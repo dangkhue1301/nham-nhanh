@@ -1,6 +1,6 @@
 import React from 'react';
 import { AttemptStatus, Question } from '../engine/types.ts';
-import { formatExpectedAnswer } from '../engine/normalizeAnswer.ts';
+import { formatAnswer } from '../engine/normalizeAnswer.ts';
 
 interface FeedbackProps {
   status: AttemptStatus;
@@ -20,14 +20,11 @@ export const Feedback: React.FC<FeedbackProps> = ({
   const isTimeout = status === 'timeout';
   const isSkipped = status === 'skipped';
 
-  const expectedFormatted = formatExpectedAnswer(
-    question.answerType,
-    question.answer,
-    question.unit
-  );
+  const expectedFormatted = formatAnswer(question);
 
   return (
     <div
+      role="status"
       className={`feedback-box ${
         isCorrect || isAssisted ? 'feedback-success' : 'feedback-error'
       }`}
@@ -42,23 +39,20 @@ export const Feedback: React.FC<FeedbackProps> = ({
 
       {question.explanation && (
         <div className="feedback-explanation">
-          <strong>Cách nhẩm:</strong> {question.explanation}
+          <strong>Cách làm:</strong> {question.explanation}
         </div>
       )}
 
-      {(!isCorrect || hintUsed) && (
-        <div style={{ marginTop: '14px', textAlign: 'right' }}>
+        <div className="feedback-next">
           <button
             type="button"
             className="btn-primary"
-            style={{ width: 'auto', display: 'inline-flex', padding: '8px 20px' }}
             onClick={onNext}
-            autoFocus
+            autoFocus={!isCorrect || hintUsed}
           >
             Câu tiếp ➔
           </button>
         </div>
-      )}
     </div>
   );
 };

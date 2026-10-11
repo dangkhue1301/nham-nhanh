@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { CATALOG, getFamily } from '../src/engine/catalog.ts';
 import { validateQuestion } from '../src/engine/validateQuestion.ts';
 
-describe('All 66 Question Families Integrity & Invariants', () => {
-  it('has exactly 66 families defined in CATALOG', () => {
-    expect(CATALOG.length).toBe(66);
+describe('All 86 Question Families Integrity & Invariants', () => {
+  it('has exactly 86 families defined in CATALOG', () => {
+    expect(CATALOG.length).toBe(86);
   });
 
   CATALOG.forEach((fam) => {

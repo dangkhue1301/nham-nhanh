@@ -1,275 +1,100 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Attempt,
-  ProgressState,
-  Question,
-  SessionConfiguration,
-  SessionSummary
-} from '../engine/types.ts';
-import {
-  clearProgressState,
-  loadProgressState,
-  saveProgressState
-} from '../storage/localProgress.ts';
+import React, { useCallback, useRef, useState } from 'react';
+import { Attempt, ProgressState, Question, SessionConfiguration, SessionSummary } from '../engine/types.ts';
+import { clearProgressState, loadProgressState, saveProgressState, sanitizeConfiguration } from '../storage/localProgress.ts';
 import { HomeScreen } from '../screens/HomeScreen.tsx';
 import { PracticeScreen } from '../screens/PracticeScreen.tsx';
 import { ResultsScreen } from '../screens/ResultsScreen.tsx';
 import { selectNextQuestion } from '../engine/selectNextQuestion.ts';
-import {
-  createMemoryCardFromQuestion,
-  getDueMemoryCards,
-  getTodayLocalDateStr,
-  updateMemoryCard
-} from '../engine/spacedReview.ts';
+import { recordAttempt, summarizeSession } from '../engine/activity.ts';
+import { ScrollbarAutohide } from '../components/ScrollbarAutohide.tsx';
 
+interface ActiveSession {
+  id: string; config: SessionConfiguration; startedAt: number; seed: number;
+  index: number; total: number; attempts: Attempt[]; keys: string[]; ended: boolean;
+}
 export const App: React.FC = () => {
-  const [progressState, setProgressState] = useState<ProgressState>(() => loadProgressState().state);
-  const [isPersisted, setIsPersisted] = useState<boolean>(() => loadProgressState().isPersisted);
+  const [initial] = useState(loadProgressState);
+  const [progress, setProgress] = useState(initial.state);
+  const progressRef = useRef(progress);
+  const [isPersisted, setIsPersisted] = useState(initial.isPersisted);
+  const [screen, setScreen] = useState<'home' | 'practice' | 'results'>('home');
+  const [question, setQuestion] = useState<Question | null>(null);
+  const questionRef = useRef<Question | null>(null);
+  const sessionRef = useRef<ActiveSession | null>(null);
+  const [index, setIndex] = useState(0);
+  const [summary, setSummary] = useState<SessionSummary | null>(null);
+  const [error, setError] = useState('');
 
-  // App screen navigation: 'home' | 'practice' | 'results'
-  const [currentScreen, setCurrentScreen] = useState<'home' | 'practice' | 'results'>('home');
+  const persist = useCallback((next: ProgressState) => {
+    progressRef.current = next;
+    setIsPersisted(saveProgressState(next));
+    setProgress(next);
+  }, []);
 
-  // Session state
-  const [currentConfig, setCurrentConfig] = useState<SessionConfiguration>(progressState.lastSelection);
-  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
-  const [questionIndex, setQuestionIndex] = useState<number>(0);
-  const [sessionAttempts, setSessionAttempts] = useState<Attempt[]>([]);
-  const [withinSessionRetryQueue, setWithinSessionRetryQueue] = useState<
-    { question: Question; failedAtIndex: number }[]
-  >([]);
-  const [latestSummary, setLatestSummary] = useState<SessionSummary | null>(null);
-  const [sessionKeys, setSessionKeys] = useState<string[]>([]);
+  const prepare = useCallback((session: ActiveSession) => {
+    const next = selectNextQuestion({ configuration: session.config, currentQuestionIndex: session.index, recentSemanticKeys: progressRef.current.recentSemanticKeys, sessionKeys: session.keys, seedOffset: session.index, sessionSeed: session.seed }).question;
+    session.keys = [...session.keys, next.semanticKey, next.prompt];
+    questionRef.current = next;
+    setQuestion(next);
+    setIndex(session.index);
+  }, []);
 
-  const TOTAL_SESSION_QUESTIONS = 20;
-
-  // Persist state whenever it changes
-  useEffect(() => {
-    const success = saveProgressState(progressState);
-    setIsPersisted(success);
-  }, [progressState]);
-
-  // Generate next question
-  const prepareNextQuestion = useCallback(
-    (
-      index: number,
-      config: SessionConfiguration,
-      retryQueue = withinSessionRetryQueue,
-      currentSessionKeys = sessionKeys
-    ) => {
-      const todayStr = getTodayLocalDateStr();
-      const dueCards = getDueMemoryCards(progressState.memoryCards, todayStr);
-
-      const next = selectNextQuestion({
-        configuration: config,
-        memoryCards: progressState.memoryCards,
-        dueCards,
-        withinSessionRetryQueue: retryQueue,
-        currentQuestionIndex: index,
-        recentSemanticKeys: progressState.recentSemanticKeys,
-        sessionKeys: currentSessionKeys,
-        seedOffset: index
-      });
-
-      setCurrentQuestion(next.question);
-      setSessionKeys([...currentSessionKeys, next.question.semanticKey, next.question.prompt]);
-    },
-    [progressState, withinSessionRetryQueue, sessionKeys]
-  );
-
-  // Start a new session
-  const handleStartSession = (config: SessionConfiguration) => {
-    setCurrentConfig(config);
-    setQuestionIndex(0);
-    setSessionAttempts([]);
-    setWithinSessionRetryQueue([]);
-    setSessionKeys([]);
-
-    // Update last selection in progress
-    setProgressState((prev) => ({
-      ...prev,
-      lastSelection: config
-    }));
-
-    prepareNextQuestion(0, config, [], []);
-    setCurrentScreen('practice');
-  };
-
-  // When an attempt is completed
-  const handleAttemptCompleted = (attempt: Attempt) => {
-    const updatedAttempts = [...sessionAttempts, attempt];
-    setSessionAttempts(updatedAttempts);
-
-    const todayStr = getTodayLocalDateStr();
-
-    // Update or create memory card for spaced repetition
-    setProgressState((prev) => {
-      const card =
-        prev.memoryCards[attempt.memoryKey] ||
-        createMemoryCardFromQuestion(currentQuestion!, todayStr);
-
-      const updatedCard = updateMemoryCard({
-        card,
-        status: attempt.status,
-        elapsedMs: attempt.elapsedMs,
-        hardLimitMs: attempt.timeLimitMs,
-        todayStr,
-        snapshot: attempt.questionSnapshot
-      });
-
-      // Update topic level window
-      const windowKey = `${attempt.mode}:${attempt.topic}:${attempt.level}`;
-      const existingWindow = prev.topicLevelWindows[windowKey] || [];
-      const updatedWindow = [...existingWindow, attempt].slice(-100);
-
-      // Update table window if applicable
-      const tableWindows = { ...prev.tableWindows };
-      if (attempt.tableId) {
-        const tableKey = `${attempt.mode}:${attempt.topic}:${attempt.level}:${attempt.tableId}`;
-        const existingTableWindow = tableWindows[tableKey] || [];
-        tableWindows[tableKey] = [...existingTableWindow, attempt].slice(-40);
-      }
-
-      return {
-        ...prev,
-        memoryCards: {
-          ...prev.memoryCards,
-          [attempt.memoryKey]: updatedCard
-        },
-        topicLevelWindows: {
-          ...prev.topicLevelWindows,
-          [windowKey]: updatedWindow
-        },
-        tableWindows,
-        recentSemanticKeys: [...prev.recentSemanticKeys, attempt.semanticKey].slice(-200)
-      };
-    });
-
-    // If incorrect, assisted, or timeout, queue for retry within session
-    if (attempt.status !== 'correct' && currentQuestion) {
-      setWithinSessionRetryQueue((prev) => [
-        ...prev,
-        { question: currentQuestion, failedAtIndex: questionIndex }
-      ]);
+  const start = useCallback((configuration: SessionConfiguration) => {
+    const config = sanitizeConfiguration(configuration);
+    const session: ActiveSession = { id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `session-${Date.now()}-${Math.random().toString(36).slice(2)}`, config, startedAt: Date.now(), seed: Math.floor(Math.random() * 0x7fffffff), index: 0, total: config.mode === 'learn' ? 10 : 20, attempts: [], keys: [], ended: false };
+    sessionRef.current = session;
+    setError('');
+    try {
+      prepare(session);
+      persist({ ...progressRef.current, lastSelection: config });
+      setScreen('practice');
+    } catch (err) {
+      session.ended = true;
+      setError(err instanceof Error ? err.message : 'Chưa bắt đầu được lượt luyện. Hãy thử lại.');
+      setScreen('home');
     }
-  };
+  }, [persist, prepare]);
 
-  // Move to next question or complete session
-  const handleNextQuestion = () => {
-    const nextIdx = questionIndex + 1;
-    if (nextIdx >= TOTAL_SESSION_QUESTIONS) {
-      // Session finished! Calculate summary
-      const scoredCount = sessionAttempts.length;
-      const independentCorrect = sessionAttempts.filter((a) => a.status === 'correct');
-      const correctCount = independentCorrect.length;
-      const assistedCount = sessionAttempts.filter((a) => a.status === 'assisted').length;
-      const skippedCount = sessionAttempts.filter((a) => a.status === 'skipped').length;
-      const timeoutCount = sessionAttempts.filter((a) => a.status === 'timeout').length;
-      const incorrectCount = sessionAttempts.filter((a) => a.status === 'incorrect').length;
+  const storeSummary = useCallback((state: ProgressState, next: SessionSummary): ProgressState => ({ ...state, recentSessions: [...state.recentSessions.filter(s => s.id !== next.id), next].slice(-100) }), []);
 
-      let medianCorrectMs: number | null = null;
-      const eligibleTiming = independentCorrect.filter((a) => a.timingEligible);
-      if (eligibleTiming.length >= 5) {
-        const sortedTimes = eligibleTiming.map((a) => a.elapsedMs).sort((a, b) => a - b);
-        const mid = Math.floor(sortedTimes.length / 2);
-        medianCorrectMs =
-          sortedTimes.length % 2 === 0
-            ? Math.round((sortedTimes[mid - 1] + sortedTimes[mid]) / 2)
-            : sortedTimes[mid];
-      }
+  const completeAttempt = useCallback((attempt: Attempt) => {
+    const session = sessionRef.current;
+    if (!session || session.ended || attempt.sessionId !== session.id || attempt.questionId !== questionRef.current?.id || session.attempts.some(a => a.id === attempt.id)) return;
+    session.attempts = [...session.attempts, attempt];
+    const partial = summarizeSession(session.id, session.config, session.startedAt, session.attempts, 'interrupted', session.total);
+    persist(storeSummary(recordAttempt(progressRef.current, attempt), partial));
+  }, [persist, storeSummary]);
 
-      const summary: SessionSummary = {
-        id: `sess-${Date.now()}`,
-        configuration: currentConfig,
-        startedAt: Date.now() - 60000,
-        completedAt: Date.now(),
-        status: 'completed',
-        scoredCount,
-        independentCorrectCount: correctCount,
-        assistedCount,
-        skippedCount,
-        incorrectCount,
-        timeoutCount,
-        unansweredCount: 0,
-        medianCorrectMs,
-        bestEligible: currentConfig.mode === 'hard' && scoredCount === 20
-      };
-
-      setLatestSummary(summary);
-      setProgressState((prev) => ({
-        ...prev,
-        recentSessions: [...prev.recentSessions, summary].slice(-100)
-      }));
-
-      setCurrentScreen('results');
+  const nextQuestion = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session || session.ended || session.attempts.length !== session.index + 1) return;
+    session.index++;
+    if (session.index >= session.total) {
+      session.ended = true;
+      const result = summarizeSession(session.id, session.config, session.startedAt, session.attempts, 'completed', session.total);
+      setSummary(result);
+      persist(storeSummary(progressRef.current, result));
+      setScreen('results');
     } else {
-      setQuestionIndex(nextIdx);
-      prepareNextQuestion(nextIdx, currentConfig, withinSessionRetryQueue, sessionKeys);
+      try { prepare(session); } catch (err) { setError(err instanceof Error ? err.message : 'Chưa tạo được câu tiếp theo.'); }
     }
-  };
+  }, [persist, prepare, storeSummary]);
 
-  const handleExitSession = () => {
-    setWithinSessionRetryQueue([]);
-    setSessionAttempts([]);
-    setSessionKeys([]);
-    setCurrentScreen('home');
-  };
+  const exit = useCallback(() => {
+    const session = sessionRef.current;
+    if (session && !session.ended) {
+      session.ended = true;
+      if (session.attempts.length) persist(storeSummary(progressRef.current, summarizeSession(session.id, session.config, session.startedAt, session.attempts, 'interrupted', session.total)));
+    }
+    setScreen('home');
+  }, [persist, storeSummary]);
 
-  const handleUpdatePreferences = (pref: any) => {
-    setProgressState((prev) => ({
-      ...prev,
-      preferences: pref
-    }));
-  };
-
-  const handleClearProgress = () => {
-    clearProgressState();
-    const fresh = loadProgressState();
-    setProgressState(fresh.state);
-  };
-
-  const handleReviewMistakes = () => {
-    // Review mistakes from current session
-    handleStartSession({
-      ...currentConfig,
-      mode: 'normal',
-      isCustomReview: true
-    });
-  };
-
-  return (
-    <div style={{ width: '100%' }}>
-      {currentScreen === 'home' && (
-        <HomeScreen
-          progressState={progressState}
-          isPersisted={isPersisted}
-          onStartSession={handleStartSession}
-          onUpdatePreferences={handleUpdatePreferences}
-          onClearProgress={handleClearProgress}
-        />
-      )}
-
-      {currentScreen === 'practice' && currentQuestion && (
-        <PracticeScreen
-          configuration={currentConfig}
-          currentQuestion={currentQuestion}
-          questionIndex={questionIndex}
-          totalQuestions={TOTAL_SESSION_QUESTIONS}
-          autoAdvanceNormal={progressState.preferences.autoAdvanceNormal}
-          onAttemptCompleted={handleAttemptCompleted}
-          onExitSession={handleExitSession}
-          onNextQuestion={handleNextQuestion}
-        />
-      )}
-
-      {currentScreen === 'results' && latestSummary && (
-        <ResultsScreen
-          summary={latestSummary}
-          attempts={sessionAttempts}
-          onContinuePractice={() => handleStartSession(currentConfig)}
-          onReviewMistakes={sessionAttempts.some((a) => a.status !== 'correct') ? handleReviewMistakes : undefined}
-          onHome={() => setCurrentScreen('home')}
-        />
-      )}
-    </div>
-  );
+  const session = sessionRef.current;
+  return <div className="app-shell">
+    <ScrollbarAutohide />
+    {error && <div className="notice notice-error" role="alert">{error}<button className="btn-text" onClick={exit}>Về trang chủ</button></div>}
+    {screen === 'home' && <HomeScreen key={progress.statsStartedAt} progressState={progress} isPersisted={isPersisted} onStartSession={start} onUpdatePreferences={preferences => persist({ ...progressRef.current, preferences })} onClearProgress={() => { clearProgressState(); persist(loadProgressState().state); }} />}
+    {screen === 'practice' && question && session && <PracticeScreen key={session.id} sessionId={session.id} configuration={session.config} currentQuestion={question} questionIndex={index} totalQuestions={session.total} autoAdvanceNormal={progress.preferences.autoAdvanceNormal} onAttemptCompleted={completeAttempt} onExitSession={exit} onNextQuestion={nextQuestion} />}
+    {screen === 'results' && summary && session && <ResultsScreen summary={summary} attempts={session.attempts} onContinuePractice={() => start(session.config)} onHome={() => setScreen('home')} />}
+  </div>;
 };

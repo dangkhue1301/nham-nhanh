@@ -1,253 +1,67 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { AnswerType, RawAnswerValue, WeekdayAnswer } from '../engine/types.ts';
-import {
-  parseIntegerAnswer,
-  parseClockAnswer,
-  parseDateAnswer
-} from '../engine/normalizeAnswer.ts';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { AnswerSpec, RawAnswerValue, WeekdayAnswer } from '../engine/types.ts';
+import { parseClockAnswer, parseDateAnswer, parseNumericAnswer } from '../engine/normalizeAnswer.ts';
 import { WEEKDAY_TITLES } from '../engine/calendarMath.ts';
 
 interface AnswerInputProps {
-  questionId?: string;
-  answerType: AnswerType;
-  unit?: string;
-  disabled: boolean;
-  onSubmit: (val: RawAnswerValue) => void;
+  questionId: string; spec: AnswerSpec; disabled: boolean;
+  onSubmit: (value: RawAnswerValue) => void; submitLabel?: string;
 }
-
-export const AnswerInput: React.FC<AnswerInputProps> = ({
-  questionId,
-  answerType,
-  unit,
-  disabled,
-  onSubmit
-}) => {
-  // Integer state
-  const [intStr, setIntStr] = useState('');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  // Clock state
-  const [clockHour, setClockHour] = useState('');
-  const [clockMin, setClockMin] = useState('');
-
-  // Date state
-  const [dateDay, setDateDay] = useState('');
-  const [dateMonth, setDateMonth] = useState('');
-  const [dateYear, setDateYear] = useState('');
-
-  // Weekday state
-  const [selectedWeekday, setSelectedWeekday] = useState<WeekdayAnswer | null>(null);
-
-  const intInputRef = useRef<HTMLInputElement>(null);
-  const hourInputRef = useRef<HTMLInputElement>(null);
-  const dayInputRef = useRef<HTMLInputElement>(null);
-
-  // Auto focus input when question changes
+export const AnswerInput: React.FC<AnswerInputProps> = ({ questionId, spec, disabled, onSubmit, submitLabel = 'Trả lời' }) => {
+  const id = useId();
+  const [values, setValues] = useState<string[]>([]);
+  const [selection, setSelection] = useState<number | null>(null);
+  const [error, setError] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => {
-    setIntStr('');
-    setClockHour('');
-    setClockMin('');
-    setDateDay('');
-    setDateMonth('');
-    setDateYear('');
-    setSelectedWeekday(null);
-    setErrorMsg(null);
-
-    const timer = setTimeout(() => {
-      if (answerType === 'integer') {
-        intInputRef.current?.focus();
-      } else if (answerType === 'clock') {
-        hourInputRef.current?.focus();
-      } else if (answerType === 'date') {
-        dayInputRef.current?.focus();
-      }
-    }, 50);
+    setValues([]); setSelection(null); setError('');
+    const timer = setTimeout(() => formRef.current?.querySelector<HTMLInputElement>('input')?.focus(), 50);
     return () => clearTimeout(timer);
-  }, [questionId, answerType]);
+  }, [questionId]);
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const update = (index: number, value: string) => { setValues(prev => { const next = [...prev]; next[index] = value; return next; }); setError(''); };
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
     if (disabled) return;
-    setErrorMsg(null);
-
-    if (answerType === 'integer') {
-      const res = parseIntegerAnswer(intStr);
-      if (!res.valid) {
-        setErrorMsg(res.error || 'Đáp án chưa hợp lệ');
-        return;
-      }
-      onSubmit(res.value!);
-    } else if (answerType === 'clock') {
-      const res = parseClockAnswer(clockHour, clockMin);
-      if (!res.valid) {
-        setErrorMsg(res.error || 'Giờ/phút chưa hợp lệ');
-        return;
-      }
-      onSubmit(res.value!);
-    } else if (answerType === 'date') {
-      const res = parseDateAnswer(dateDay, dateMonth, dateYear);
-      if (!res.valid) {
-        setErrorMsg(res.error || 'Ngày tháng chưa hợp lệ');
-        return;
-      }
-      onSubmit(res.value!);
-    } else if (answerType === 'weekday') {
-      if (!selectedWeekday) {
-        setErrorMsg('Vui lòng chọn một thứ trong tuần');
-        return;
-      }
-      onSubmit(selectedWeekday);
+    if (spec.answerType === 'choice' || spec.answerType === 'weekday') {
+      if (selection === null) { setError('Chọn một đáp án trước khi kiểm tra.'); return; }
+      onSubmit(selection); return;
     }
+    if (spec.answerType === 'clock' || spec.answerType === 'date') {
+      const parsed = spec.answerType === 'clock' ? parseClockAnswer(values[0] || '', values[1] || '') : parseDateAnswer(values[0] || '', values[1] || '', values[2] || '');
+      if (!parsed.valid) { setError(parsed.error || 'Đáp án chưa hợp lệ.'); return; }
+      onSubmit(parsed.value!); return;
+    }
+    if (spec.answerType === 'blanks') {
+      const parsed = (spec.fields || []).map((f, i) => parseNumericAnswer(values[i] || '', f.type));
+      const invalid = parsed.findIndex(p => !p.valid);
+      if (invalid >= 0) { setError(`${spec.fields![invalid].label}: ${parsed[invalid].error}`); return; }
+      onSubmit(parsed.map(p => p.value as number)); return;
+    }
+    const parsed = parseNumericAnswer(values[0] || '', spec.answerType as 'integer' | 'signed' | 'decimal');
+    if (!parsed.valid) { setError(parsed.error || 'Đáp án chưa hợp lệ.'); return; }
+    onSubmit(parsed.value!);
   };
-
-  return (
-    <form onSubmit={handleSubmit} className="answer-area">
-      {answerType === 'integer' && (
-        <div>
-          <div style={{ position: 'relative' }}>
-            <input
-              ref={intInputRef}
-              type="text"
-              inputMode="numeric"
-              className="input-control answer-input-integer"
-              value={intStr}
-              placeholder="?"
-              disabled={disabled}
-              onChange={(e) => {
-                setIntStr(e.target.value);
-                setErrorMsg(null);
-              }}
-              autoComplete="off"
-            />
-            {unit && (
-              <span
-                style={{
-                  position: 'absolute',
-                  right: '16px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--color-text-secondary)',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  pointerEvents: 'none'
-                }}
-              >
-                {unit}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {answerType === 'clock' && (
-        <div className="clock-inputs">
-          <input
-            ref={hourInputRef}
-            type="text"
-            inputMode="numeric"
-            className="input-control clock-field"
-            value={clockHour}
-            placeholder="HH"
-            maxLength={2}
-            disabled={disabled}
-            onChange={(e) => {
-              setClockHour(e.target.value);
-              setErrorMsg(null);
-              if (e.target.value.length === 2) {
-                const next = e.target.nextElementSibling?.nextElementSibling as HTMLInputElement;
-                next?.focus();
-              }
-            }}
-          />
-          <span style={{ fontSize: '24px', fontWeight: 800 }}>:</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            className="input-control clock-field"
-            value={clockMin}
-            placeholder="mm"
-            maxLength={2}
-            disabled={disabled}
-            onChange={(e) => {
-              setClockMin(e.target.value);
-              setErrorMsg(null);
-            }}
-          />
-        </div>
-      )}
-
-      {answerType === 'date' && (
-        <div className="date-inputs">
-          <input
-            ref={dayInputRef}
-            type="text"
-            inputMode="numeric"
-            className="input-control date-field"
-            value={dateDay}
-            placeholder="DD"
-            maxLength={2}
-            disabled={disabled}
-            onChange={(e) => {
-              setDateDay(e.target.value);
-              setErrorMsg(null);
-            }}
-          />
-          <span style={{ fontSize: '20px', fontWeight: 700 }}>/</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            className="input-control date-field"
-            value={dateMonth}
-            placeholder="MM"
-            maxLength={2}
-            disabled={disabled}
-            onChange={(e) => {
-              setDateMonth(e.target.value);
-              setErrorMsg(null);
-            }}
-          />
-          <span style={{ fontSize: '20px', fontWeight: 700 }}>/</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            className="input-control date-field"
-            style={{ width: '90px' }}
-            value={dateYear}
-            placeholder="YYYY"
-            maxLength={4}
-            disabled={disabled}
-            onChange={(e) => {
-              setDateYear(e.target.value);
-              setErrorMsg(null);
-            }}
-          />
-        </div>
-      )}
-
-      {answerType === 'weekday' && (
-        <div className="weekday-buttons">
-          {([2, 3, 4, 5, 6, 7, 8] as WeekdayAnswer[]).map((w) => (
-            <button
-              key={w}
-              type="button"
-              className={`weekday-btn ${selectedWeekday === w ? 'selected' : ''}`}
-              disabled={disabled}
-              onClick={() => {
-                setSelectedWeekday(w);
-                setErrorMsg(null);
-              }}
-            >
-              {WEEKDAY_TITLES[w]}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {errorMsg && <div className="error-text">{errorMsg}</div>}
-
-      <div style={{ display: 'none' }}>
-        <button type="submit">Submit</button>
-      </div>
-    </form>
-  );
+  const input = (index: number, label: string, type: 'integer' | 'signed' | 'decimal', unit?: string, maxLength?: number) => <div className="answer-field" key={index}>
+    <label className="form-label" htmlFor={`${id}-${index}`}>{label}</label>
+    <div className="input-with-unit">
+      <input id={`${id}-${index}`} type="text" inputMode={type === 'signed' ? 'text' : type === 'decimal' ? 'decimal' : 'numeric'} className="input-control answer-number" value={values[index] || ''} placeholder={type === 'signed' ? 'Ví dụ: −3' : type === 'decimal' ? 'Ví dụ: 12,5' : '?'} maxLength={maxLength} disabled={disabled} onChange={e => update(index, e.target.value)} autoComplete="off" aria-invalid={!!error} aria-describedby={`${id}-error`} />
+      {unit && <span className="input-unit">{unit}</span>}
+    </div>
+  </div>;
+  const options = spec.answerType === 'choice' ? spec.choices!.map((label, value) => ({ label, value })) : ([2,3,4,5,6,7,8] as WeekdayAnswer[]).map(value => ({ label: WEEKDAY_TITLES[value], value }));
+  return <form ref={formRef} onSubmit={submit} className="answer-area">
+    {['integer','signed','decimal'].includes(spec.answerType) && input(0, 'Đáp án của bạn', spec.answerType as 'integer' | 'signed' | 'decimal', spec.unit)}
+    {spec.answerType === 'blanks' && <div className="blank-fields">{spec.fields!.map((f, i) => input(i, f.label, f.type, f.unit))}</div>}
+    {spec.answerType === 'clock' && <div className="date-fields">{input(0, 'Giờ (0–23)', 'integer', undefined, 2)}{input(1, 'Phút (0–59)', 'integer', undefined, 2)}</div>}
+    {spec.answerType === 'date' && <div className="date-fields">{input(0, 'Ngày', 'integer', undefined, 2)}{input(1, 'Tháng', 'integer', undefined, 2)}{input(2, 'Năm', 'integer', undefined, 4)}</div>}
+    {(spec.answerType === 'choice' || spec.answerType === 'weekday') && <fieldset className={spec.answerType === 'weekday' ? 'choice-grid weekdays' : 'choice-grid'}>
+      <legend className="form-label">Chọn đáp án</legend>
+      {options.map(({ label, value }) => <label className={`choice-option ${selection === value ? 'selected' : ''}`} key={value}>
+        <input type="radio" name={id} value={value} checked={selection === value} disabled={disabled} onChange={() => { setSelection(value); setError(''); }} /><span>{label}</span>
+      </label>)}
+    </fieldset>}
+    <div id={`${id}-error`} className="input-error" role="status" aria-live="polite">{error}</div>
+    <button type="submit" className="btn-primary" disabled={disabled}>{submitLabel}<span className="key-hint" aria-hidden="true">Enter</span></button>
+  </form>;
 };

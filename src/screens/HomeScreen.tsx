@@ -1,152 +1,40 @@
 import React, { useState } from 'react';
-import { ProgressState, SessionConfiguration } from '../engine/types.ts';
-import { LevelPicker } from '../components/LevelPicker.tsx';
-import { getDueMemoryCards, getTodayLocalDateStr } from '../engine/spacedReview.ts';
+import { Preferences, ProgressState, SessionConfiguration } from '../engine/types.ts';
+import { LevelPicker, MODE_NAMES } from '../components/LevelPicker.tsx';
 import { evaluateAttemptsWindow } from '../engine/progress.ts';
 import { PreferencesModal } from '../components/PreferencesModal.tsx';
-import { LEVEL_LABELS, TOPIC_NAMES } from '../engine/catalog.ts';
+import { DailyStatsPanel } from '../components/DailyStatsPanel.tsx';
+import { TOPIC_NAMES } from '../engine/catalog.ts';
 
-interface HomeScreenProps {
-  progressState: ProgressState;
-  isPersisted: boolean;
+interface Props {
+  progressState: ProgressState; isPersisted: boolean;
   onStartSession: (config: SessionConfiguration) => void;
-  onUpdatePreferences: (pref: any) => void;
-  onClearProgress: () => void;
+  onUpdatePreferences: (pref: Preferences) => void; onClearProgress: () => void;
 }
-
-export const HomeScreen: React.FC<HomeScreenProps> = ({
-  progressState,
-  isPersisted,
-  onStartSession,
-  onUpdatePreferences,
-  onClearProgress
-}) => {
-  const [config, setConfig] = useState<SessionConfiguration>(progressState.lastSelection);
-  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
-  const [isProgressExpanded, setIsProgressExpanded] = useState(false);
-
-  const todayStr = getTodayLocalDateStr();
-  const dueCards = getDueMemoryCards(progressState.memoryCards, todayStr);
-
-  const currentWindowKey = `${config.mode}:${config.topic}:${config.level}`;
-  const currentAttempts = progressState.topicLevelWindows[currentWindowKey] || [];
-  const evaluation = evaluateAttemptsWindow(currentAttempts);
-
-  const hasHistory = progressState.recentSessions.length > 0;
-
-  const handleStartPractice = () => {
-    onStartSession(config);
-  };
-
-  const handleStartDueReview = () => {
-    onStartSession({
-      topic: config.topic,
-      level: config.level,
-      mode: 'normal',
-      isCustomReview: true
-    });
-  };
-
-  return (
-    <div className="glass-card">
-      <div className="app-title">
-        <span>⚡</span> Nhẩm Nhanh
-      </div>
-      <div className="app-subtitle">Luyện tính nhanh mỗi ngày</div>
-
-      <LevelPicker configuration={config} onChange={setConfig} />
-
-      {/* Progress line */}
-      <div
-        style={{
-          margin: '16px 0 20px',
-          fontSize: '13px',
-          color: 'var(--color-text-secondary)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}
-      >
-        <span>
-          {TOPIC_NAMES[config.topic]} · {LEVEL_LABELS[config.topic][config.level]}
-        </span>
-        <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
-          {currentAttempts.length > 0
-            ? `${evaluation.independentCorrectCount}/${Math.min(currentAttempts.length, 40)} câu đúng`
-            : 'Mới bắt đầu'}
-        </span>
-      </div>
-
-      {/* Start Button */}
-      <button type="button" className="btn-primary" onClick={handleStartPractice}>
-        {hasHistory ? 'Luyện tiếp 20 câu' : 'Bắt đầu'}
-      </button>
-
-      {/* Due reviews button */}
-      {dueCards.length > 0 && (
-        <div style={{ marginTop: '12px' }}>
-          <button
-            type="button"
-            className="btn-secondary"
-            style={{ width: '100%', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
-            onClick={handleStartDueReview}
-          >
-            Ôn hôm nay · {dueCards.length} mục đến hạn
-          </button>
-        </div>
-      )}
-
-      {/* Options link */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-        <button
-          type="button"
-          className="btn-text"
-          onClick={() => setIsPreferencesOpen(true)}
-        >
-          ⚙ Tùy chọn
-        </button>
-
-        <button
-          type="button"
-          className="btn-text"
-          onClick={() => setIsProgressExpanded(!isProgressExpanded)}
-        >
-          {isProgressExpanded ? '▲ Thu gọn tiến độ' : '▼ Chi tiết tiến độ'}
-        </button>
-      </div>
-
-      {/* Detailed progress accordion */}
-      {isProgressExpanded && (
-        <div className="collapsible-section">
-          <p style={{ fontWeight: 600, marginBottom: '8px' }}>
-            Trạng thái level hiện tại:
-          </p>
-          <div style={{ marginBottom: '8px' }}>
-            <strong>Đánh giá: </strong>
-            {evaluation.status === 'fast' && '⚡ Nhẩm nhanh'}
-            {evaluation.status === 'solid' && '✓ Đúng vững'}
-            {evaluation.status === 'learning' && '⏳ Đang luyện'}
-          </div>
-          <p style={{ fontSize: '13px', lineHeight: '1.4' }}>
-            {evaluation.recommendation}
-          </p>
-
-          <div style={{ marginTop: '14px' }}>
-            <p style={{ fontWeight: 600, marginBottom: '4px' }}>Thẻ ghi nhớ đang theo dõi:</p>
-            <p>Tổng số: {Object.keys(progressState.memoryCards).length} thẻ</p>
-            <p>Đến hạn hôm nay: {dueCards.length} thẻ</p>
-          </div>
-        </div>
-      )}
-
-      <PreferencesModal
-        isOpen={isPreferencesOpen}
-        preferences={progressState.preferences}
-        isPersisted={isPersisted}
-        onClose={() => setIsPreferencesOpen(false)}
-        onUpdatePreferences={onUpdatePreferences}
-        onClearProgress={onClearProgress}
-      />
-    </div>
-  );
+export const HomeScreen: React.FC<Props> = ({ progressState, isPersisted, onStartSession, onUpdatePreferences, onClearProgress }) => {
+  const [config, setConfig] = useState(progressState.lastSelection);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const evaluation = evaluateAttemptsWindow(progressState.topicLevelWindows[`${config.mode}:${config.topic}:${config.level}`] || []);
+  return <>
+    <header className="home-header">
+      <div><div className="brand"><span className="brand-mark" aria-hidden="true">ϟ</span><h1>Nhẩm Nhanh</h1></div><p className="muted">Nhanh hơn từ những phép tính nhỏ mỗi ngày.</p></div>
+      <button className="btn-secondary settings-button" onClick={() => setPreferencesOpen(true)}>Tùy chọn</button>
+    </header>
+    <main className="home-grid">
+      <section className="glass-card training-card" aria-labelledby="training-title">
+        <span className="accent-label">Ưu tiên luyện tính nhẩm nhanh</span>
+        <h2 id="training-title">Bắt đầu lượt luyện</h2>
+        <p className="muted section-intro">Chọn mức vừa sức. Tính đúng trước, rồi rút ngắn thời gian.</p>
+        <LevelPicker configuration={config} onChange={setConfig} />
+        <button className="btn-primary" onClick={() => onStartSession(config)}>{config.mode === 'learn' ? 'Bắt đầu 10 bài từng bước' : 'Bắt đầu 20 câu'}<span aria-hidden="true">→</span></button>
+        <button className="btn-text quick-reset" onClick={() => setConfig({ topic: 'mixed', level: 1, mode: 'normal' })}>Chọn nhanh: nhẩm 4 phép tính cơ bản</button>
+        <details className="progress-details"><summary>Tiến độ ở mức đang chọn <span>{evaluation.totalEvaluated ? `${evaluation.independentCorrectCount}/${evaluation.totalEvaluated} đúng` : 'Chưa có kết quả'}</span></summary><div className="details-body"><strong>{evaluation.status === 'fast' ? 'Nhẩm nhanh' : evaluation.status === 'solid' ? 'Đúng vững' : 'Đang luyện'}</strong><p>{evaluation.recommendation}</p><p>Đánh giá trên 40 câu gần nhất của chủ đề, cấp độ và cách luyện này.</p></div></details>
+        <div className="learning-path"><h3>Xây nền tảng để nhẩm nhanh</h3><p>Tách–ghép số → Hằng đẳng thức → Phân tích nhân tử → Diện tích.</p><p className="muted">Chưa biết cách làm? Chọn “Học từng bước” ở các chủ đề này.</p></div>
+      </section>
+      <DailyStatsPanel progress={progressState} />
+      {progressState.recentSessions.length > 0 && <section className="glass-card history-card" aria-labelledby="history-title"><h2 id="history-title">Các lượt gần đây</h2><ul className="session-list">{progressState.recentSessions.slice(-5).reverse().map(session => <li key={session.id}><div><strong>{TOPIC_NAMES[session.configuration.topic]} · Mức {session.configuration.level}</strong><span className="muted">{new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(session.startedAt)} · {MODE_NAMES[session.configuration.mode]} · {session.status === 'completed' ? 'Hoàn thành' : 'Dừng giữa lượt'}</span></div><span className="session-score">{session.independentCorrectCount}/{session.scoredCount}<small>đúng</small></span></li>)}</ul></section>}
+    </main>
+    <footer className="home-footer"><p>{isPersisted ? 'Tiến độ được lưu trên trình duyệt này sau mỗi câu.' : 'Chưa lưu được trên trình duyệt. Kết quả hiện chỉ giữ trong phiên này.'}</p><p>Ngày thống kê theo giờ Việt Nam. Bài nhiều bước chỉ tính một câu.</p></footer>
+    <PreferencesModal isOpen={preferencesOpen} preferences={progressState.preferences} isPersisted={isPersisted} onClose={() => setPreferencesOpen(false)} onUpdatePreferences={onUpdatePreferences} onClearProgress={onClearProgress} />
+  </>;
 };

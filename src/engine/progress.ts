@@ -14,7 +14,7 @@ export function evaluateAttemptsWindow(
   attempts: Attempt[],
   windowSize = 40
 ): EvaluationResult {
-  // Filter out interrupted attempts
+  // Legacy or invalid attempts may explicitly opt out of mastery evaluation.
   const eligible = attempts.filter((a) => a.progressEligible);
   const recent = eligible.slice(-windowSize);
 
@@ -49,10 +49,10 @@ export function evaluateAttemptsWindow(
   const accuracy = Math.round((correctCount / windowSize) * 100);
 
   // Calculate median of (elapsedMs / hardLimitMs) for timingEligible correct answers
-  const timingEligible = independentCorrect.filter((a) => a.timingEligible && a.timeLimitMs > 0);
+  const timingEligible = independentCorrect.filter((a) => a.timingEligible && a.benchmarkLimitMs > 0);
   let medianRatio: number | null = null;
   if (timingEligible.length >= 5) {
-    const ratios = timingEligible.map((a) => a.elapsedMs / (a.timeLimitMs > 0 ? a.timeLimitMs : 10000)).sort((x, y) => x - y);
+    const ratios = timingEligible.map((a) => a.elapsedMs / a.benchmarkLimitMs).sort((x, y) => x - y);
     const mid = Math.floor(ratios.length / 2);
     medianRatio = ratios.length % 2 === 0 ? (ratios[mid - 1] + ratios[mid]) / 2 : ratios[mid];
   }
@@ -65,7 +65,7 @@ export function evaluateAttemptsWindow(
       accuracyPercent: accuracy,
       medianRatio,
       canAdvance: false,
-      recommendation: `Đạt ${correctCount}/40 câu đúng độc lập (${accuracy}%). Nên luyện thêm để đạt trên 90%.`
+      recommendation: `Đạt ${correctCount}/40 câu đúng độc lập (${accuracy}%). Nên luyện thêm để đạt ít nhất 90%.`
     };
   }
 
@@ -80,7 +80,7 @@ export function evaluateAttemptsWindow(
       accuracyPercent: accuracy,
       medianRatio,
       canAdvance: true,
-      recommendation: 'Xuất sắc! Bạn đã vừa đúng vững vừa nhẩm nhanh. Hãy sẵn sàng lên Level tiếp theo!'
+      recommendation: 'Bạn đã tính đúng vững và nhẩm nhanh. Có thể thử mức tiếp theo.'
     };
   }
 
@@ -91,7 +91,7 @@ export function evaluateAttemptsWindow(
     accuracyPercent: accuracy,
     medianRatio,
     canAdvance: true,
-    recommendation: 'Bạn tính rất chuẩn xác! Có thể chuyển sang Hard mode để tăng tốc độ phản xạ hoặc lên Level tiếp theo.'
+    recommendation: 'Bạn tính đúng vững. Có thể thử Tốc độ cao hoặc chuyển lên mức tiếp theo.'
   };
 }
 

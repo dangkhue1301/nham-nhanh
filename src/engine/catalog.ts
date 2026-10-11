@@ -7,6 +7,7 @@ import { generateExpressionsQuestion } from './generators/expressions.ts';
 import { generateMoneyQuestion } from './generators/money.ts';
 import { generateTimeQuestion } from './generators/time.ts';
 import { generateCalendarQuestion } from './generators/calendar.ts';
+import { generateThinkingQuestion, THINKING_TOPICS } from './generators/thinking.ts';
 
 export const TOPIC_NAMES: Record<Topic, string> = {
   addition: 'Phép cộng',
@@ -16,10 +17,18 @@ export const TOPIC_NAMES: Record<Topic, string> = {
   mixed: 'Trộn bốn phép',
   money: 'Tiền & mua sắm',
   time: 'Thời gian',
-  calendar: 'Ngày tháng'
+  calendar: 'Ngày tháng',
+  decomposition: 'Tách–ghép số',
+  identities: 'Hằng đẳng thức',
+  factoring: 'Phân tích đa thức',
+  geometry: 'Diện tích'
 };
 
 export const LEVEL_LABELS: Record<Topic, Record<number, string>> = {
+  decomposition: { 1: 'Mức 1 · Bù đủ chục, trăm', 2: 'Mức 2 · Làm tròn và bù', 3: 'Mức 3 · Ghép thừa số', 4: 'Mức 4 · Cặp tổng–tích', 5: 'Mức 5 · Biến đổi để nhẩm' },
+  identities: { 1: 'Mức 1 · Bình phương tổng', 2: 'Mức 2 · Bình phương hiệu', 3: 'Mức 3 · Hiệu hai bình phương', 4: 'Mức 4 · Lập phương tổng, hiệu', 5: 'Mức 5 · Tổng, hiệu lập phương' },
+  factoring: { 1: 'Mức 1 · Nhân tử chung', 2: 'Mức 2 · Nhận dạng hằng đẳng thức', 3: 'Mức 3 · Nhóm hạng tử', 4: 'Mức 4 · Tách hạng tử giữa', 5: 'Mức 5 · Phối hợp các cách' },
+  geometry: { 1: 'Mức 1 · Vuông, chữ nhật', 2: 'Mức 2 · Tam giác', 3: 'Mức 3 · Bình hành, thoi, thang', 4: 'Mức 4 · Hình tròn, đổi đơn vị', 5: 'Mức 5 · Hình ghép, phần tô màu' },
   addition: {
     1: 'Level 1 · Dưới 10',
     2: 'Level 2 · Trong phạm vi 20',
@@ -819,7 +828,15 @@ export const CATALOG: FamilyDefinition[] = [
     hardLimitMs: () => 25000,
     timingProfileVersion: 1,
     generator: (seed, level) => generateCalendarQuestion('C08', level, seed)
-  }
+  },
+  ...THINKING_TOPICS.flatMap((topic, topicIndex) => [1, 2, 3, 4, 5].map((level): FamilyDefinition => ({
+    familyId: `${['N', 'H', 'F', 'G'][topicIndex]}0${level}`,
+    name: LEVEL_LABELS[topic][level], topic, allowedLevels: [level], skillTags: [topic],
+    normalLimitMs: () => level <= 2 ? 20000 : level <= 4 ? 40000 : 60000,
+    hardLimitMs: () => level <= 2 ? 10000 : level <= 4 ? 20000 : 30000,
+    timingProfileVersion: 2,
+    generator: (seed) => generateThinkingQuestion(topic, level, seed)
+  })))
 ];
 
 export const CATALOG_MAP = new Map<string, FamilyDefinition>(

@@ -6,11 +6,15 @@ export type Topic =
   | 'mixed'
   | 'money'
   | 'time'
-  | 'calendar';
+  | 'calendar'
+  | 'decomposition'
+  | 'identities'
+  | 'factoring'
+  | 'geometry';
 
-export type Mode = 'normal' | 'hard';
+export type Mode = 'normal' | 'hard' | 'learn';
 
-export type AnswerType = 'integer' | 'clock' | 'date' | 'weekday';
+export type AnswerType = 'integer' | 'signed' | 'decimal' | 'clock' | 'date' | 'weekday' | 'choice' | 'blanks';
 
 export interface ClockAnswer {
   hour: number;   // 0 - 23
@@ -26,15 +30,41 @@ export interface DateAnswer {
 // weekday answer: 2 = Thứ Hai, 3 = Thứ Ba, 4 = Thứ Tư, 5 = Thứ Năm, 6 = Thứ Sáu, 7 = Thứ Bảy, 8 = Chủ Nhật
 export type WeekdayAnswer = 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-export type RawAnswerValue = number | ClockAnswer | DateAnswer | WeekdayAnswer;
+export type RawAnswerValue = number | number[] | ClockAnswer | DateAnswer | WeekdayAnswer;
 
-export interface QuestionSnapshot {
-  prompt: string;
+export interface AnswerField {
+  label: string;
+  type: 'integer' | 'signed' | 'decimal';
+  unit?: string;
+}
+
+export interface AnswerSpec {
   answerType: AnswerType;
   answer: RawAnswerValue;
   unit?: string;
+  fields?: AnswerField[];
+  choices?: string[];
+  unordered?: boolean;
+}
+
+export interface LearningStep extends AnswerSpec {
+  prompt: string;
   hint: string;
   explanation: string;
+}
+
+export interface GeometryDiagram {
+  kind: 'rectangle' | 'square' | 'triangle' | 'parallelogram' | 'rhombus' | 'trapezoid' | 'circle' | 'composite';
+  dimensions: Record<string, number>;
+  unit: string;
+}
+
+export interface QuestionSnapshot extends AnswerSpec {
+  prompt: string;
+  hint: string;
+  explanation: string;
+  steps?: LearningStep[];
+  diagram?: GeometryDiagram;
 }
 
 export interface Question extends QuestionSnapshot {
@@ -52,7 +82,6 @@ export interface Question extends QuestionSnapshot {
   normalLimitMs: number;
   hardLimitMs: number;
   timingProfileVersion: number;
-  reviewReason?: 'due' | 'mistake' | 'slow' | 'within_session';
 }
 
 export type AttemptStatus =
@@ -63,6 +92,7 @@ export type AttemptStatus =
   | 'timeout';
 
 export interface Attempt {
+  id: string;
   questionId: string;
   familyId: string;
   generatorVersion: number;
@@ -76,6 +106,7 @@ export interface Attempt {
   mode: Mode;
   timingProfileVersion: number;
   timeLimitMs: number;
+  benchmarkLimitMs: number;
   memoryKey: string;
   submittedAnswer: any;
   status: AttemptStatus;
@@ -83,7 +114,6 @@ export interface Attempt {
   timingEligible: boolean;
   progressEligible: boolean;
   hintUsed: boolean;
-  reviewReason?: 'due' | 'mistake' | 'slow' | 'within_session';
   answeredAt: number;
 }
 
@@ -92,7 +122,6 @@ export interface SessionConfiguration {
   level: number;
   mode: Mode;
   tableId?: number;
-  isCustomReview?: boolean; // Review Due or Review Mistakes
 }
 
 export interface SessionSummary {
@@ -113,22 +142,19 @@ export interface SessionSummary {
   recommendation?: string;
 }
 
-export interface MemoryCard {
-  memoryKey: string;
-  kind: 'fact' | 'skill';
-  topic: Topic;
-  level: number;
-  familyId: string;
-  factParameters?: Record<string, any>;
-  scheduleStage: number; // 0..5 (0: none, 1: 1d, 2: 3d, 3: 7d, 4: 14d, 5: 30d)
-  dueLocalDate: string; // YYYY-MM-DD
-  lastPracticedAt: number;
-  lastAdvancedLocalDate?: string;
-  successfulReviewDates: string[]; // List of YYYY-MM-DD
-  successRunStartDate?: string;
-  lastOutcome: AttemptStatus;
-  lapses: number;
-  latestIncorrectSnapshot?: QuestionSnapshot;
+export interface DailyCounts {
+  total: number;
+  correct: number;
+  assisted: number;
+  incorrect: number;
+  skipped: number;
+  timeout: number;
+  timedCorrectCount: number;
+  correctElapsedMs: number;
+}
+
+export interface DailyStats extends DailyCounts {
+  bySelection: Record<string, DailyCounts>;
 }
 
 export interface Preferences {
@@ -144,7 +170,9 @@ export interface ProgressState {
   recentSemanticKeys: string[];
   recentSessions: SessionSummary[];
   bestHardRuns: Record<string, { correctCount: number; totalElapsedMs: number; date: string }>;
-  memoryCards: Record<string, MemoryCard>;
+  dailyStats: Record<string, DailyStats>;
+  recentAttemptIds: string[];
+  statsStartedAt: number;
 }
 
 export type MasteryStatus = 'learning' | 'solid' | 'fast'; // Đang luyện | Đúng vững | Nhẩm nhanh
