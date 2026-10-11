@@ -99,7 +99,7 @@ export function generateSubtractionQuestion(familyId: string, level: number, see
       answer = a - b;
       hint = isCrossTen
         ? `Trừ ${a - 10} để về 10, rồi trừ tiếp phần còn lại của ${b}.`
-        : `Lấy hàng đơn vị trừ hàng đơn vị: ${a % 10} − ${b}, rồi ghép vào hàng chục.`;
+        : a === 20 ? `Tách 20 = 10 + 10: lấy 10 − ${b} rồi cộng với 10 còn lại.` : `Lấy hàng đơn vị trừ hàng đơn vị: ${a % 10} − ${b}, rồi ghép vào hàng chục.`;
       explanation = isCrossTen
         ? `${a} − ${b} = (${a} − ${a - 10}) − (${b - (a - 10)}) = 10 − ${b - (a - 10)} = ${answer}`
         : `${a} − ${b} = ${answer}`;
@@ -219,7 +219,7 @@ export function generateSubtractionQuestion(familyId: string, level: number, see
   return {
     id: `${familyId}-${level}-${seed}`,
     familyId,
-    generatorVersion: 1,
+    generatorVersion: familyId === 'S03' ? 2 : 1,
     seed,
     topic: 'subtraction',
     level,

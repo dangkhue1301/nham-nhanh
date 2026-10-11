@@ -18,6 +18,8 @@ Nhóm mới dùng giới hạn Luyện nhẩm/Tốc độ cao: mức 1–2 là 2
 
 Kết quả lưu ngay sau từng bài đã chấm, kể cả khi dừng giữa lượt. Thống kê theo ngày ở múi giờ Việt Nam gồm số câu, độ chính xác và thời gian trung bình của câu đúng có thời gian. Có bộ lọc chủ đề, cách luyện và lịch sử 7/30/tất cả ngày.
 
+Chỉ một tab được luyện tại một thời điểm. Các tab khác vẫn xem và cập nhật thống kê; bắt đầu lượt mới hoặc thay đổi/xóa tiến độ phải chờ tab đang luyện kết thúc. Cần trình duyệt hiện đại hỗ trợ Web Locks. Khi tạm dừng Luyện nhẩm/Học từng bước, đáp án đang nhập được giữ nguyên; không tự chuyển câu trong nền. Ngày thống kê tự cập nhật lúc nửa đêm và khi quay lại tab.
+
 Độ chính xác = số câu đúng độc lập / tổng số câu đã chấm. Các trạng thái có trợ giúp, sai, bỏ qua và hết giờ được tách riêng. Trong Học từng bước, thử sai hoặc dùng gợi ý khiến cả bài được tính có trợ giúp khi hoàn tất. Câu đang làm chưa chấm không được tính.
 
 Dữ liệu dùng khóa localStorage nham-nhanh:v2. Lịch sử v1 được chuyển sang v2 khi lưu lần tiếp theo; khóa v1 vẫn giữ nguyên làm bản dự phòng. Thống kê ngày bắt đầu từ bản cập nhật này vì lịch sử cũ không đủ để tái dựng chính xác. Nếu trình duyệt chặn lưu trữ, ứng dụng giữ kết quả trong bộ nhớ của phiên đang mở.

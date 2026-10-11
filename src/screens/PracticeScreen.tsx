@@ -10,7 +10,7 @@ import { LEVEL_LABELS, TOPIC_NAMES } from '../engine/catalog.ts';
 interface PracticeScreenProps {
   sessionId: string; configuration: SessionConfiguration; currentQuestion: Question;
   questionIndex: number; totalQuestions: number; autoAdvanceNormal: boolean;
-  onAttemptCompleted: (attempt: Attempt) => void; onExitSession: () => void; onNextQuestion: () => void;
+  onAttemptCompleted: (attempt: Attempt) => void; onExitSession: () => void; onNextQuestion: () => void | Promise<void>;
 }
 export const PracticeScreen: React.FC<PracticeScreenProps> = ({ sessionId, configuration, currentQuestion: question, questionIndex, totalQuestions, autoAdvanceNormal, onAttemptCompleted, onExitSession, onNextQuestion }) => {
   const learning = configuration.mode === 'learn';
@@ -24,6 +24,8 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({ sessionId, confi
   const [hintLevel, setHintLevel] = useState(0);
   const started = useRef(performance.now());
   const paused = useRef<number | null>(null);
+  const beforePause = useRef<'answering' | 'feedback'>('answering');
+  const resumeFocus = useRef<HTMLElement | null>(null);
   const pausedDuration = useRef(0);
   const interrupted = useRef(false);
   const assisted = useRef(false);
@@ -43,15 +45,15 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({ sessionId, confi
     return () => { if (autoTimer.current) clearTimeout(autoTimer.current); };
   }, [question.id, timeLimit]);
 
-  const next = useCallback(() => {
-    if (advancing.current) return;
+  const next = useCallback(async () => {
+    if (advancing.current || document.hidden || state !== 'feedback') return;
     advancing.current = true;
     if (autoTimer.current) clearTimeout(autoTimer.current);
-    onNextQuestion();
-  }, [onNextQuestion]);
+    try { await onNextQuestion(); } finally { advancing.current = false; }
+  }, [onNextQuestion, state]);
 
   const finish = useCallback((action: 'submit' | 'skip' | 'timeout', value?: RawAnswerValue) => {
-    if (completed.current || state !== 'answering') return;
+    if (completed.current || state !== 'answering' || paused.current !== null || document.hidden) return;
     completed.current = true;
     const elapsedMs = Math.max(1, Math.round(performance.now() - started.current - pausedDuration.current));
     const scored = scoreAttempt({ question, submittedAnswer: value, action, hintUsed: assisted.current, elapsedMs, mode: configuration.mode, selectedTopic: configuration.topic, sessionId, isInterrupted: interrupted.current });
@@ -61,6 +63,7 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({ sessionId, confi
   useEffect(() => {
     if (state !== 'answering' || learning) return;
     const tick = () => {
+      if (document.hidden || paused.current !== null) return;
       const left = timeLimit - (performance.now() - started.current - pausedDuration.current);
       setRemaining(Math.max(0, left));
       if (left <= 0) finish('timeout');
@@ -70,7 +73,7 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({ sessionId, confi
   }, [state, learning, timeLimit, finish]);
 
   useEffect(() => {
-    if (state !== 'feedback' || attempt?.status !== 'correct' || learning || (configuration.mode === 'normal' && !autoAdvanceNormal)) return;
+    if (document.hidden || state !== 'feedback' || attempt?.status !== 'correct' || learning || (configuration.mode === 'normal' && !autoAdvanceNormal)) return;
     autoTimer.current = setTimeout(next, 300);
     return () => { if (autoTimer.current) clearTimeout(autoTimer.current); };
   }, [state, attempt, learning, configuration.mode, autoAdvanceNormal, next]);
@@ -79,16 +82,21 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({ sessionId, confi
     const visibility = () => {
       if (!document.hidden) return;
       if (configuration.mode === 'hard') { onExitSession(); return; }
-      if (state === 'answering' && paused.current === null) {
-        paused.current = performance.now(); interrupted.current = true; setState('paused');
+      if (state !== 'paused' && paused.current === null) {
+        if (autoTimer.current) clearTimeout(autoTimer.current);
+        beforePause.current = completed.current ? 'feedback' : 'answering';
+        resumeFocus.current = document.activeElement as HTMLElement | null;
+        if (!completed.current) { paused.current = performance.now(); interrupted.current = true; }
+        setState('paused');
       }
     };
     document.addEventListener('visibilitychange', visibility);
+    visibility();
     return () => document.removeEventListener('visibilitychange', visibility);
   }, [configuration.mode, state, onExitSession]);
 
   const submit = (value: RawAnswerValue) => {
-    if (completed.current || stepLocked.current || state !== 'answering') return;
+    if (completed.current || stepLocked.current || state !== 'answering' || paused.current !== null || document.hidden) return;
     if (!learning || !steps.length) { finish('submit', value); return; }
     if (!areAnswersEqual(spec.answerType, value, spec.answer, spec.unordered)) {
       assisted.current = true; setStepError('Chưa đúng. Kiểm tra lại dấu, phép tính hoặc dùng gợi ý.'); return;
@@ -99,16 +107,18 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({ sessionId, confi
   };
   const showHint = () => { assisted.current = true; setHintLevel(prev => Math.min(prev + 1, 2)); };
   const resume = () => {
+    if (document.hidden) return;
     if (paused.current !== null) { pausedDuration.current += performance.now() - paused.current; paused.current = null; }
-    setState('answering');
+    setState(beforePause.current);
+    setTimeout(() => resumeFocus.current?.focus(), 0);
   };
-  if (state === 'paused') return <section className="glass-card practice-card pause-screen">
+  return <>
+  {state === 'paused' && <section className="glass-card practice-card pause-screen">
     <span className="eyebrow">Lượt luyện đã tạm dừng</span><h1>Tiếp tục khi bạn sẵn sàng</h1>
-    <p className="muted">Các câu đã làm vẫn được lưu. Câu này không dùng để đánh giá tốc độ vì đã có gián đoạn.</p>
+    <p className="muted">Các câu đã làm vẫn được lưu.{beforePause.current === 'answering' && ' Câu này không dùng để đánh giá tốc độ vì đã có gián đoạn.'}</p>
     <button className="btn-primary" onClick={resume}>Tiếp tục làm bài</button><button className="btn-text" onClick={onExitSession}>Về trang chủ</button>
-  </section>;
-
-  return <section className="glass-card practice-card">
+  </section>}
+  <section className="glass-card practice-card" hidden={state === 'paused'}>
     <div className="practice-toolbar">
       <header className="practice-header">
         <button className="btn-back practice-back" onClick={onExitSession} aria-label="Kết thúc lượt và về trang chủ"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6" /></svg></button>
@@ -131,8 +141,8 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({ sessionId, confi
       <button className="btn-text" onClick={() => finish('skip')}>Bỏ qua câu này</button>
     </div>}
     {hintLevel > 0 && state === 'answering' && <div className="notice notice-hint" role="status"><strong>{hintLevel === 1 ? 'Gợi ý' : 'Cách làm'}</strong><p>{hintLevel === 1 ? spec.hint : `${spec.explanation} Đáp án: ${formatAnswer(spec)}`}</p></div>}
-    {stepError && <div className="notice notice-error" role="status">{stepError}</div>}
+    {stepError && state === 'answering' && <div className="notice notice-error" role="status">{stepError}</div>}
     {stepFeedback && state === 'answering' && <div className="feedback-box feedback-success" role="status"><strong>Bước này đúng rồi</strong><p>{spec.explanation}</p><button className="btn-primary" autoFocus onClick={() => { setStepIndex(i => i + 1); setStepFeedback(false); setHintLevel(0); stepLocked.current = false; }}>Bước tiếp</button></div>}
-    {state === 'feedback' && attempt && <Feedback status={attempt.status} question={question} hintUsed={attempt.hintUsed} onNext={next} />}
-  </section>;
+    {state === 'feedback' && attempt && <Feedback status={attempt.status} question={question} hintUsed={attempt.hintUsed} onNext={next} nextLabel={questionIndex === totalQuestions - 1 ? 'Xem kết quả' : undefined} />}
+  </section></>;
 };

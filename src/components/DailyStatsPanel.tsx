@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ProgressState, DailyCounts } from '../engine/types.ts';
 import { emptyCounts, filterDay, vietnamDate } from '../engine/activity.ts';
 import { TOPIC_GROUPS, MODE_NAMES } from './LevelPicker.tsx';
@@ -15,7 +15,16 @@ export const DailyStatsPanel: React.FC<{ progress: ProgressState }> = ({ progres
   const [topic, setTopic] = useState('all');
   const [mode, setMode] = useState('all');
   const [range, setRange] = useState('7');
-  const today = vietnamDate();
+  const [today, setToday] = useState(vietnamDate);
+  useEffect(() => {
+    const updateDay = () => setToday(vietnamDate());
+    const midnight = Date.parse(`${today}T00:00:00+07:00`) + 86400000;
+    const timer = setTimeout(updateDay, Math.max(1, midnight - Date.now()));
+    window.addEventListener('focus', updateDay);
+    window.addEventListener('pageshow', updateDay);
+    document.addEventListener('visibilitychange', updateDay);
+    return () => { clearTimeout(timer); window.removeEventListener('focus', updateDay); window.removeEventListener('pageshow', updateDay); document.removeEventListener('visibilitychange', updateDay); };
+  }, [today]);
   const todayCounts = filterDay(progress.dailyStats[today], topic, mode);
   const dates = range === 'all' ? [...new Set([...Object.keys(progress.dailyStats), today])].sort() : lastDays(today, Number(range));
   const rows = dates.map(date => ({ date, counts: filterDay(progress.dailyStats[date], topic, mode) }));

@@ -118,7 +118,7 @@ export function generateCalendarQuestion(familyId: string, level: number, seed: 
       const month = prng.pick([1, 3, 4, 5, 7, 8, 10]); // avoid year end and feb for standard C05
       const daysInM = getDaysInMonth(month, year);
       const d = prng.nextInt(daysInM - 6, daysInM);
-      const offset = prng.nextInt(5, 12);
+      const offset = prng.nextInt(Math.max(5, daysInM - d + 1), 12);
       const startDate: DateAnswer = { day: d, month, year };
       const targetDate = addDaysToDate(startDate, offset);
       const tpl = prng.pick(CALENDAR_TEMPLATES.C05);
@@ -142,7 +142,7 @@ export function generateCalendarQuestion(familyId: string, level: number, seed: 
       const year = prng.nextInt(2024, 2028);
       // Dec 28..31
       const day = prng.nextInt(28, 31);
-      const offset = prng.nextInt(3, 10);
+      const offset = prng.nextInt(Math.max(3, 31 - day + 1), 10);
       const startDate: DateAnswer = { day, month: 12, year };
       const targetDate = addDaysToDate(startDate, offset);
       const tpl = prng.pick(CALENDAR_TEMPLATES.C06);
@@ -211,7 +211,7 @@ export function generateCalendarQuestion(familyId: string, level: number, seed: 
   return {
     id: `${familyId}-${level}-${seed}`,
     familyId,
-    generatorVersion: 1,
+    generatorVersion: ['C05', 'C06'].includes(familyId) ? 2 : 1,
     seed,
     topic: 'calendar',
     level,

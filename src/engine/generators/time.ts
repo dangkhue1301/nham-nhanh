@@ -98,7 +98,7 @@ export function generateTimeQuestion(familyId: string, level: number, seed: numb
       // e.g. 9:45 -> 10:20 = 35 min
       const h1 = prng.nextInt(7, 18);
       const m1 = prng.nextInt(35, 55);
-      const diff = prng.nextInt(20, 50);
+      const diff = prng.nextInt(Math.max(20, 60 - m1), 50);
       const totalMin = h1 * 60 + m1 + diff;
       const h2 = Math.floor(totalMin / 60);
       const m2 = totalMin % 60;
@@ -155,7 +155,7 @@ export function generateTimeQuestion(familyId: string, level: number, seed: numb
       // Start between 22:30 and 23:55, duration 20..75 min
       const startH = prng.pick([22, 23]);
       const startM = prng.nextInt(startH === 22 ? 45 : 15, 55);
-      const duration = prng.nextInt(20, 75);
+      const duration = prng.nextInt(Math.max(20, 24 * 60 - (startH * 60 + startM)), 75);
       const totalMinutes = startH * 60 + startM + duration;
       const endMinutesOfDay = totalMinutes % (24 * 60);
       const endH = Math.floor(endMinutesOfDay / 60);
@@ -226,7 +226,7 @@ export function generateTimeQuestion(familyId: string, level: number, seed: numb
   return {
     id: `${familyId}-${level}-${seed}`,
     familyId,
-    generatorVersion: 1,
+    generatorVersion: ['T04', 'T06'].includes(familyId) ? 2 : 1,
     seed,
     topic: 'time',
     level,

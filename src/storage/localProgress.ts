@@ -12,6 +12,7 @@ export function createInitialState(): ProgressState {
 }
 export const INITIAL_PROGRESS_STATE = createInitialState();
 let inMemoryStorage: ProgressState | null = null;
+let memoryDirty = false;
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 export function sanitizeConfiguration(value: unknown): SessionConfiguration {
@@ -73,6 +74,7 @@ export function isLocalStorageAvailable(): boolean {
   try { return typeof window !== 'undefined' && !!window.localStorage; } catch { return false; }
 }
 export function loadProgressState(): { state: ProgressState; isPersisted: boolean } {
+  if (memoryDirty && inMemoryStorage) return { state: inMemoryStorage, isPersisted: false };
   if (!isLocalStorageAvailable()) return { state: inMemoryStorage ?? createInitialState(), isPersisted: false };
   try {
     let raw = window.localStorage.getItem(STORAGE_KEY);
@@ -86,24 +88,35 @@ export function loadProgressState(): { state: ProgressState; isPersisted: boolea
     if (raw) {
       try { return { state: sanitizeState(JSON.parse(raw)), isPersisted: true }; } catch { /* Recover usable in-memory data. */ }
     }
-    return { state: inMemoryStorage ?? createInitialState(), isPersisted: true };
+    // An absent disk record can mean another tab cleared progress. Do not resurrect a cached snapshot.
+    return { state: createInitialState(), isPersisted: true };
   } catch { return { state: inMemoryStorage ?? createInitialState(), isPersisted: false }; }
 }
 export function saveProgressState(state: ProgressState): boolean {
   inMemoryStorage = state;
+  memoryDirty = true;
   try {
     if (!isLocalStorageAvailable()) return false;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    memoryDirty = false;
     return true;
   } catch { return false; }
 }
 export function clearProgressState(): boolean {
-  inMemoryStorage = createInitialState();
   try {
     if (isLocalStorageAvailable()) {
-      window.localStorage.removeItem(STORAGE_KEY);
       window.localStorage.removeItem(LEGACY_KEY);
+      window.localStorage.removeItem(STORAGE_KEY);
     }
+    inMemoryStorage = createInitialState();
+    memoryDirty = false;
     return true;
   } catch { return false; }
+}
+
+export async function updateProgressState(update: (state: ProgressState) => ProgressState): Promise<{ state: ProgressState; isPersisted: boolean }> {
+  return navigator.locks.request('nham-nhanh:progress', () => {
+    const state = update(loadProgressState().state);
+    return { state, isPersisted: saveProgressState(state) };
+  });
 }

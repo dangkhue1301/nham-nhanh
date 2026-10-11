@@ -7,13 +7,15 @@ interface FeedbackProps {
   question: Question;
   hintUsed: boolean;
   onNext: () => void;
+  nextLabel?: string;
 }
 
 export const Feedback: React.FC<FeedbackProps> = ({
   status,
   question,
   hintUsed,
-  onNext
+  onNext,
+  nextLabel = 'Câu tiếp ➔'
 }) => {
   const isCorrect = status === 'correct';
   const isAssisted = status === 'assisted';
@@ -31,7 +33,7 @@ export const Feedback: React.FC<FeedbackProps> = ({
     >
       <div className="feedback-title">
         {isCorrect && '✓ Đúng rồi! Tuyệt vời.'}
-        {isAssisted && '✓ Đúng sau khi xem gợi ý.'}
+        {isAssisted && '✓ Đúng sau khi thử lại hoặc dùng gợi ý.'}
         {isTimeout && `⏱ Hết giờ! Đáp án là: ${expectedFormatted}`}
         {isSkipped && `↷ Đã bỏ qua. Đáp án là: ${expectedFormatted}`}
         {!isCorrect && !isAssisted && !isTimeout && !isSkipped && `✗ Chưa đúng. Đáp án là: ${expectedFormatted}`}
@@ -50,7 +52,7 @@ export const Feedback: React.FC<FeedbackProps> = ({
             onClick={onNext}
             autoFocus={!isCorrect || hintUsed}
           >
-            Câu tiếp ➔
+            {nextLabel}
           </button>
         </div>
     </div>

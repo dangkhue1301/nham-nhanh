@@ -1,5 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { clearProgressState, createInitialState, loadProgressState, saveProgressState, sanitizeConfiguration, STORAGE_KEY } from '../src/storage/localProgress.ts';
+import { clearProgressState, createInitialState, loadProgressState, saveProgressState, sanitizeConfiguration, STORAGE_KEY, updateProgressState } from '../src/storage/localProgress.ts';
+import { acquirePracticeLock } from '../src/storage/practiceLock.ts';
+import { testLocks } from './helpers/locks.ts';
 import { emptyDay, recordAttempt, vietnamDate } from '../src/engine/activity.ts';
 import { generateAdditionQuestion } from '../src/engine/generators/addition.ts';
 import { scoreAttempt } from '../src/engine/scoreAttempt.ts';
@@ -9,6 +11,7 @@ beforeEach(() => {
   data = new Map();
   vi.stubGlobal('window', { localStorage: { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => data.set(key, value), removeItem: (key: string) => data.delete(key) } });
   clearProgressState();
+  vi.stubGlobal('navigator', { locks: testLocks() });
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 describe('Safe local progress and v1 migration', () => {
@@ -51,5 +54,45 @@ describe('Safe local progress and v1 migration', () => {
     expect(sanitizeConfiguration({ topic: 'addition', mode: 'learn', level: 1, tableId: 7 })).toMatchObject({ mode: 'normal', tableId: undefined });
     expect(sanitizeConfiguration({ topic: 'factoring', mode: 'learn', level: 4 })).toMatchObject({ mode: 'learn', level: 4 });
     expect(sanitizeConfiguration({ topic: 'multiplication', mode: 'hard', level: 1, tableId: 7 }).tableId).toBe(7);
+  });
+  it('keeps a failed write in memory even when an older disk version can still be read', () => {
+    const old = createInitialState(); saveProgressState(old);
+    const next = { ...old, lastSelection: { topic: 'geometry' as const, level: 3, mode: 'learn' as const } };
+    window.localStorage.setItem = () => { throw new Error('quota'); };
+    expect(saveProgressState(next)).toBe(false);
+    expect(loadProgressState()).toEqual({ state: next, isPersisted: false });
+    window.localStorage.setItem = (key, value) => data.set(key, value);
+    expect(saveProgressState(loadProgressState().state)).toBe(true);
+    expect(loadProgressState().state.lastSelection.topic).toBe('geometry');
+  });
+  it('does not reset live progress or claim success when clearing storage fails', () => {
+    const old = createInitialState(); old.lastSelection.topic = 'geometry'; saveProgressState(old);
+    window.localStorage.removeItem = () => { throw new Error('blocked'); };
+    expect(clearProgressState()).toBe(false);
+    expect(loadProgressState().state.lastSelection.topic).toBe('geometry');
+  });
+  it('does not resurrect cached progress after another tab clears its disk record', () => {
+    const state = createInitialState(); state.lastSelection.topic = 'geometry'; saveProgressState(state);
+    data.delete(STORAGE_KEY);
+    expect(loadProgressState().state.lastSelection.topic).toBe('addition');
+    expect(loadProgressState().state.dailyStats).toEqual({});
+  });
+  it('serializes concurrent updates using the latest state instead of overwriting another writer', async () => {
+    const q = generateAdditionQuestion('A01', 1, 777);
+    const a = scoreAttempt({ question: q, submittedAnswer: q.answer, action: 'submit', elapsedMs: 1000, mode: 'normal', sessionId: 'one', hintUsed: false });
+    await Promise.all([
+      updateProgressState(state => recordAttempt(state, a)),
+      updateProgressState(state => ({ ...state, preferences: { autoAdvanceNormal: false } })),
+      updateProgressState(state => recordAttempt(state, { ...a, id: 'another', sessionId: 'two' }))
+    ]);
+    const state = loadProgressState().state;
+    expect(state.dailyStats[vietnamDate()].total).toBe(2);
+    expect(state.preferences.autoAdvanceNormal).toBe(false);
+  });
+  it('allows one practice owner and releases it for the next tab', async () => {
+    const release = await acquirePracticeLock();
+    await expect(acquirePracticeLock()).rejects.toThrow('Đang có lượt luyện ở tab khác');
+    await release();
+    const nextRelease = await acquirePracticeLock(); await nextRelease();
   });
 });
